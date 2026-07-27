@@ -1,0 +1,33 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('sy_data', function (Blueprint $table) {
+            $table->id();
+            $table->string('name', 100);
+            $table->string('description', 300);
+            $table->boolean('active_flag');
+            $table->bigInteger("created_by_id")->default(0)->index();
+            $table->bigInteger("updated_by_id")->default(0)->index();
+            $table->timestamps();
+            $table->softDeletes();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('sy_data');
+    }
+};
