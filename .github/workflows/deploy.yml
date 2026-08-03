@@ -1,0 +1,139 @@
+name: 🚀 Build & Deploy Production
+
+on:
+  push:
+    branches:
+      - master
+
+  # Bisa juga trigger manual dari GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────
+  # JOB 1: Build assets (Composer + Vite)
+  # ─────────────────────────────────────────
+  build:
+    name: 🔨 Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout kode
+        uses: actions/checkout@v4
+
+      - name: 🐘 Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, bcmath, gd, pdo_mysql, zip, exif
+          tools: composer:v2
+
+      - name: 📦 Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: 🔧 Install Composer dependencies (production)
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install npm dependencies
+        run: npm ci
+
+      - name: ⚡ Build assets dengan Vite
+        run: npm run build
+
+      - name: 📁 Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact
+          path: |
+            .
+            !.git
+            !node_modules
+            !tests
+            !.env
+            !.env.*
+            !docker
+            !docker-compose.yml
+            !sail
+            !.agents
+          retention-days: 1
+
+  # ─────────────────────────────────────────
+  # JOB 2: Deploy ke VPS via SSH
+  # ─────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy ke Production
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+
+    steps:
+      - name: 📥 Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: ./release
+
+      - name: 🔑 Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: 🛡️ Tambah server ke known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 📤 Sync file ke server via rsync
+        run: |
+          rsync -azP \
+            --delete \
+            --exclude='.env' \
+            --exclude='storage/app/public' \
+            --exclude='storage/logs' \
+            --exclude='storage/framework/cache' \
+            --exclude='storage/framework/sessions' \
+            --exclude='storage/framework/views' \
+            ./release/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+      - name: ⚙️ Jalankan post-deploy commands di server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            echo "📄 Copy .env jika belum ada..."
+            [ -f .env ] || cp .env.example .env
+
+            echo "🔑 Generate app key jika belum ada..."
+            php artisan key:generate --no-interaction --force
+
+            echo "🔗 Symlink storage..."
+            php artisan storage:link --no-interaction || true
+
+            echo "🗃️ Jalankan migrasi database..."
+            php artisan migrate --force --no-interaction
+
+            echo "🧹 Clear & cache config untuk production..."
+            php artisan config:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            echo "🔁 Restart queue worker (jika ada)..."
+            php artisan queue:restart || true
+
+            echo "✅ Deploy selesai!"
