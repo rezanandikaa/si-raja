@@ -10,9 +10,56 @@ on:
 
 jobs:
   # ─────────────────────────────────────────
-  # JOB 1: Build assets (Composer + Vite)
+  # JOB 1: Test
+  # ─────────────────────────────────────────
+  test:
+    name: 🧪 Test
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: testing
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: 📥 Checkout kode
+        uses: actions/checkout@v4
+
+      - name: 🐘 Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, bcmath, gd, pdo_mysql, zip, exif
+          tools: composer:v2
+
+      - name: 📦 Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: ⚙️ Setup .env untuk testing
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: 🧪 Jalankan tests
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: testing
+          DB_USERNAME: root
+          DB_PASSWORD: password
+        run: php artisan test --parallel
+
+  # ─────────────────────────────────────────
+  # JOB 2: Build assets (Composer + Vite)
   # ─────────────────────────────────────────
   build:
+    needs: test
     name: 🔨 Build
     runs-on: ubuntu-latest
 
@@ -67,7 +114,7 @@ jobs:
           retention-days: 1
 
   # ─────────────────────────────────────────
-  # JOB 2: Deploy ke VPS via SSH
+  # JOB 3: Deploy ke VPS via SSH
   # ─────────────────────────────────────────
   deploy:
     name: 🚀 Deploy ke Production
@@ -115,11 +162,16 @@ jobs:
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
 
+            echo "🔧 Maintenance mode ON..."
+            php artisan down --retry=15 || true
+
             echo "📄 Copy .env jika belum ada..."
             [ -f .env ] || cp .env.example .env
 
-            echo "🔑 Generate app key jika belum ada..."
-            php artisan key:generate --no-interaction --force
+            echo "🔑 Generate app key jika belum ada (skip jika sudah ada)..."
+            php artisan key:generate --no-interaction --show | grep -q '^base64:' \
+              && grep -q '^APP_KEY=base64:' .env \
+              || php artisan key:generate --no-interaction
 
             echo "🔗 Symlink storage..."
             php artisan storage:link --no-interaction || true
@@ -128,12 +180,12 @@ jobs:
             php artisan migrate --force --no-interaction
 
             echo "🧹 Clear & cache config untuk production..."
-            php artisan config:clear
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
+            php artisan optimize
 
             echo "🔁 Restart queue worker (jika ada)..."
             php artisan queue:restart || true
+
+            echo "🚀 Maintenance mode OFF..."
+            php artisan up
 
             echo "✅ Deploy selesai!"
