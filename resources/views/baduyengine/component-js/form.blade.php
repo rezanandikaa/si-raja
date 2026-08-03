@@ -223,7 +223,7 @@ $(document).ready(function(){
                 @break
             @case('map-marker')
                 @if (isset($item['map_type']) && $item['map_type'] == 'google-map')
-                    <script type="text/javascript" async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAdJMC6B3wLW1EQRWTw379aOPTp3fHTHMg&libraries=places&callback=initMap">
+                    <script type="text/javascript" async defer src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google.maps_api_key') }}&libraries=places&callback=initMap">
                     </script>
                     
                     <script type="text/javascript">
