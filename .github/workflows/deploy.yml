@@ -1,11 +1,7 @@
 name: 🚀 Build & Deploy Production
 
 on:
-  push:
-    branches:
-      - master
-
-  # Bisa juga trigger manual dari GitHub Actions tab
+  # trigger manual dari GitHub Actions tab
   workflow_dispatch:
 
 jobs:
