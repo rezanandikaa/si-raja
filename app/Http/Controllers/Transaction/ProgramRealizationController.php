@@ -90,7 +90,7 @@ class ProgramRealizationController extends Controller
         $summary_data[] = [
             'title' => 'Total Realisasi',
             'value' => number_format(round($collection->sum('budget_realization'), 0)),
-            'description' => 'Semua Strategi OPPKPE',
+            'description' => 'Semua Strategi OPPKPKE',
             'class' => 'col-lg-3 col-md-6 col-sm-6',
         ];
         $data = [
