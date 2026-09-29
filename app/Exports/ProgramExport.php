@@ -211,7 +211,7 @@ class ProgramExport implements FromView, WithStyles
         $header->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $header->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $header->getAlignment()->setWrapText(true);
-        $header->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE7E6E6');
+        $header->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFB4C6E7');
 
         // Border seluruh tabel.
         $sheet->getStyle("A1:{$last_column}{$last_row}")->applyFromArray([
