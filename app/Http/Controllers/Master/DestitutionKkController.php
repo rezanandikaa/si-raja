@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\Master\Mt_destitution_kk;
+use App\Models\System\Sy_option;
 use App\Models\Transaction\Tr_program_realization_bnba;
 use App\Repositories\CompileRepository;
 use App\Repositories\Master\DestitutionKkRepository;
@@ -88,6 +89,7 @@ class DestitutionKkController extends Controller
                         </button>
                         <div class="dropdown-menu" aria-labelledby="btnGroupDrop1" style="">
                             <a href="'.route($this->route_prefix.'detail',$data->id).'" class="dropdown-item">Lihat</a>
+                            <a data-id="delete-'.$data->id.'" data-url="'.route('master.destitution_kk.delete').'" class="delete dropdown-item">Hapus</a>
                         </div>
                     </div>
                     ';
@@ -98,37 +100,167 @@ class DestitutionKkController extends Controller
         }
     }
 
+    // Kolom NOT NULL di mt_destitution_kk yang belum punya field di form ini.
+    // Harus diisi 0 supaya insert tidak gagal.
+    // Kolom yang sudah punya field jangan didaftarkan di sini: loop ini jalan paling
+    // akhir di payload() sehingga akan menimpa nilai dari form jadi 0.
+    const NOT_NULL_DEFAULTS = [
+        'priority_verval_id', 'padan_dukcapil_id',
+        'home_electricity_id', 'home_cooking_id',
+    ];
+
+    const BANTUAN_FLAGS = ['is_pkh', 'is_bpnt', 'is_bst', 'is_bpum', 'is_kur', 'is_prakerja', 'is_sembako'];
+
+    private function field($label, $name, $type, $required = false, $extra = [])
+    {
+        return array_merge([
+            'label' => $label,
+            'name' => $name,
+            'placeholder' => $label,
+            'type' => $type,
+            'required' => $required,
+            'show_only' => false,
+            'validate_message' => $label . ' wajib diisi',
+        ], $extra);
+    }
+
+    private function regionField($label, $name, $type, $required = true)
+    {
+        return $this->field($label, $name, 'data', $required, [
+            'data_table' => 'mt_region',
+            'data_condition' => ' and mt_region.type = "' . $type . '"',
+            'data_extra' => '',
+        ]);
+    }
+
+    private function optionField($label, $name, $code, $required = false)
+    {
+        return $this->field($label, $name, 'data', $required, [
+            'data_table' => 'sy_option',
+            'data_condition' => ' and sy_option.code = "' . $code . '"',
+            'data_extra' => '',
+        ]);
+    }
+
     public function get_form()
     {
         $fields = [];
 
-        $fields['user_access_id'] = [
-            'label' => 'Hak Akses Pengguna',
-            'name' => 'user_access_id',
-            'placeholder' => 'Hak Akses Pengguna',
-            'type' => 'data',
-            'data_table' => 'mt_user',
-            'data_condition' => '',
-            'data_extra' => '',
-            'required' => true,
-            'show_only' => false,
-            'validate_message' => 'Hak Akses Pengguna wajib diisi'
-        ];
+        // Identitas
+        $fields['p3ke'] = $this->field('No. KK', 'p3ke', 'text', true, ['maxlength' => 100]);
+        $fields['last_update_year'] = $this->field('Tahun Update', 'last_update_year', 'number', true);
+        $fields['nik'] = $this->field('NIK', 'nik', 'text', true, ['maxlength' => 20]);
+        $fields['name'] = $this->field('Nama', 'name', 'text', true, ['maxlength' => 100]);
 
-        $fields['file_id'] = [
-            'label' => 'Hak Akses Pengguna',
-            'name' => 'file_id',
-            'placeholder' => 'Hak Akses Pengguna',
-            'type' => 'data',
-            'data_table' => 'sy_file',
-            'data_condition' => '',
-            'data_extra' => '',
-            'required' => true,
-            'show_only' => false,
-            'validate_message' => 'Hak Akses Pengguna wajib diisi'
-        ];
+        // Wilayah
+        $fields['province_id'] = $this->regionField('Provinsi', 'province_id', '1-PROVINSI');
+        $fields['regency_id'] = $this->regionField('Kabupaten/Kota', 'regency_id', '2-KABUPATEN/KOTA');
+        $fields['district_id'] = $this->regionField('Kecamatan', 'district_id', '3-KECAMATAN');
+        $fields['subdistrict_id'] = $this->regionField('Desa/Kelurahan', 'subdistrict_id', '4-DESA-KELURAHAN');
+        $fields['address'] = $this->field('Alamat', 'address', 'text-area', false, ['maxlength' => 500]);
+
+        // Kesejahteraan
+        $fields['decile'] = $this->field('Desil Kesejahteraan', 'decile', 'number', true);
+        $fields['percentile'] = $this->field('Persentil', 'percentile', 'number');
+
+        // Demografi
+        $fields['gender_id'] = $this->optionField('Jenis Kelamin', 'gender_id', 'gender', true);
+        $fields['birth_date'] = $this->field('Tanggal Lahir', 'birth_date', 'date');
+        $fields['job_id'] = $this->optionField('Pekerjaan', 'job_id', 'job');
+        $fields['job_status_id'] = $this->optionField('Status Pekerjaan', 'job_status_id', 'job_status');
+        $fields['education_id'] = $this->optionField('Pendidikan', 'education_id', 'education');
+        $fields['marital_status_id'] = $this->optionField('Status Kawin', 'marital_status_id', 'marital_status');
+        $fields['home_ownership_id'] = $this->optionField('Status Rumah', 'home_ownership_id', 'home_ownership');
+        $fields['etc_ownership_id'] = $this->optionField('Memiliki Simpanan/Uang/Perhiasan/Ternak/Lainnya', 'etc_ownership_id', 'etc_ownership');
+
+        // Kondisi rumah. Jenis dan kualitasnya berpasangan, urutan kolomnya mengikuti
+        // halaman detail supaya mudah dicocokkan.
+        $fields['home_roof_id'] = $this->optionField('Jenis Atap', 'home_roof_id', 'home_roof');
+        $fields['home_roof_quality_id'] = $this->optionField('Kualitas Atap', 'home_roof_quality_id', 'home_roof_quality');
+        $fields['home_wall_id'] = $this->optionField('Jenis Dinding', 'home_wall_id', 'home_wall');
+        $fields['home_wall_quality_id'] = $this->optionField('Kualitas Dinding', 'home_wall_quality_id', 'home_wall_quality');
+        $fields['home_floor_id'] = $this->optionField('Jenis Lantai', 'home_floor_id', 'home_floor');
+        $fields['home_floor_quality_id'] = $this->optionField('Kualitas Lantai', 'home_floor_quality_id', 'home_floor_quality');
+        $fields['home_electricity_power_id'] = $this->optionField('Daya Listrik Rumah', 'home_electricity_power_id', 'home_electricity_power');
+        $fields['home_water_id'] = $this->optionField('Sumber Air Minum', 'home_water_id', 'home_water');
+        $fields['home_toilet_ownership_id'] = $this->optionField('Fasilitas Buang Air Besar', 'home_toilet_ownership_id', 'home_toilet_ownership');
+        $fields['stunting_risk_id'] = $this->optionField('Resiko Stunting', 'stunting_risk_id', 'stunting_risk');
+
+        // Bantuan
+        $fields['is_pkh'] = $this->field('PKH', 'is_pkh', 'checkbox');
+        $fields['is_bpnt'] = $this->field('BPNT', 'is_bpnt', 'checkbox');
+        $fields['is_bst'] = $this->field('BST', 'is_bst', 'checkbox');
+        $fields['is_bpum'] = $this->field('BPUM', 'is_bpum', 'checkbox');
+        $fields['is_kur'] = $this->field('KUR', 'is_kur', 'checkbox');
+        $fields['is_prakerja'] = $this->field('Prakerja', 'is_prakerja', 'checkbox');
+        $fields['is_sembako'] = $this->field('Sembako', 'is_sembako', 'checkbox');
 
         return $fields;
+    }
+
+    // Rule tambahan untuk field yang tidak tercakup CompileRepository::validateRule.
+    private function extra_rules()
+    {
+        return [
+            'last_update_year' => 'required|integer|digits:4',
+            'decile' => 'required|integer|min:1',
+            'percentile' => 'nullable|integer|min:1',
+            'birth_date' => 'nullable|date',
+        ];
+    }
+
+    // Susun baris mt_destitution_kk dari input form.
+    private function payload(Request $request)
+    {
+        $gender_id = (int) ($request->gender_id ?? 0);
+        $gender_value = $gender_id ? Sy_option::where('id', $gender_id)->value('value') : null;
+
+        $data = [
+            // data_id harus sama dengan sumber data aktif, kalau tidak barisnya
+            // tidak akan muncul di datatable (get_data filter kolom ini).
+            'data_id' => source_data_active(),
+            'p3ke' => $request->p3ke,
+            'last_update_year' => (int) $request->last_update_year,
+            'nik' => $request->nik,
+            'name' => $request->name,
+            'province_id' => (int) $request->province_id,
+            'regency_id' => (int) $request->regency_id,
+            'district_id' => (int) $request->district_id,
+            'subdistrict_id' => (int) $request->subdistrict_id,
+            'address' => $request->address ?? '',
+            'decile' => (int) $request->decile,
+            'percentile' => (int) ($request->percentile ?? 0),
+            'gender_id' => $gender_id,
+            // kolom gender cuma 1 huruf: "LAKI-LAKI" -> "L", "PEREMPUAN" -> "P".
+            'gender' => $gender_value ? strtoupper(substr($gender_value, 0, 1)) : null,
+            'birth_date' => $request->birth_date ? Carbon::parse($request->birth_date)->format('Y-m-d') : null,
+            'job_id' => (int) ($request->job_id ?? 0),
+            'job_status_id' => (int) ($request->job_status_id ?? 0),
+            'education_id' => (int) ($request->education_id ?? 0),
+            'marital_status_id' => (int) ($request->marital_status_id ?? 0),
+            'home_ownership_id' => (int) ($request->home_ownership_id ?? 0),
+            'etc_ownership_id' => (int) ($request->etc_ownership_id ?? 0),
+            'home_roof_id' => (int) ($request->home_roof_id ?? 0),
+            'home_roof_quality_id' => (int) ($request->home_roof_quality_id ?? 0),
+            'home_wall_id' => (int) ($request->home_wall_id ?? 0),
+            'home_wall_quality_id' => (int) ($request->home_wall_quality_id ?? 0),
+            'home_floor_id' => (int) ($request->home_floor_id ?? 0),
+            'home_floor_quality_id' => (int) ($request->home_floor_quality_id ?? 0),
+            'home_electricity_power_id' => (int) ($request->home_electricity_power_id ?? 0),
+            'home_water_id' => (int) ($request->home_water_id ?? 0),
+            'home_toilet_ownership_id' => (int) ($request->home_toilet_ownership_id ?? 0),
+            'stunting_risk_id' => (int) ($request->stunting_risk_id ?? 0),
+        ];
+
+        foreach (self::BANTUAN_FLAGS as $flag) {
+            $data[$flag] = $request->$flag ? 1 : 0;
+        }
+
+        foreach (self::NOT_NULL_DEFAULTS as $column) {
+            $data[$column] = 0;
+        }
+
+        return $data;
     }
 
     public function insert()
@@ -151,15 +283,20 @@ class DestitutionKkController extends Controller
 
         $this->compile_repo->make($data);
 
+        // make() selalu mengisi tipe 'date' dengan tanggal hari ini. Untuk tanggal
+        // lahir itu salah: kalau petugas tidak membuka kalender, hari ini ikut tersimpan.
+        $data['fields']['birth_date']['value'] = '';
+
         return view('backpage.master_destitution_kk.form',compact('data'));
     }
 
     public function store(Request $request)
     {
-        $validated = Validator::make($request->all(), [
-            'user_access_name' => 'required|max:100|unique:mt_user_access,user_access_name',
-            'user_access_desc' => 'required|max:300'
-        ]);
+        $rules = array_merge(
+            $this->compile_repo->validateRule($this->get_form()),
+            $this->extra_rules()
+        );
+        $validated = Validator::make($request->all(), $rules);
         if($validated->fails()){
             $result = [
                 'status' => 'FAIL',
@@ -168,12 +305,7 @@ class DestitutionKkController extends Controller
             return response()->json($result);
         }
 
-        $access_module = [];
-        $this->generateAccessModule($access_module, $request);
-
-        $data['user_access_name'] = $request->user_access_name;
-        $data['user_access_desc'] = $request->user_access_desc;
-        $data['access_module'] = json_encode($access_module);
+        $data = $this->payload($request);
 
         try {
             DB::beginTransaction();
@@ -182,7 +314,7 @@ class DestitutionKkController extends Controller
                 'status' => 'OK',
                 'message' => 'Data tersimpan'
             ];
-            logbook('Berhasil menambahkan P3KE Kepala Keluarga Pengguna', 201);
+            logbook('Berhasil menambahkan P3KE Kepala Keluarga', 201);
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -204,7 +336,6 @@ class DestitutionKkController extends Controller
         }
 
         $datas = $this->destitution_kk_repo->getRecord($id)->toArray();
-        $this->getAccessModule($datas);
 
         $data = [
             'fields' => $this->get_form(),
@@ -227,10 +358,11 @@ class DestitutionKkController extends Controller
 
     public function update(Request $request, $id)
     {
-        $validated = Validator::make($request->all(), [
-            'user_access_name' => 'required|max:100|unique:mt_user_access,user_access_name,'.$id,
-            'user_access_desc' => 'required|max:300'
-        ]);
+        $rules = array_merge(
+            $this->compile_repo->validateRule($this->get_form()),
+            $this->extra_rules()
+        );
+        $validated = Validator::make($request->all(), $rules);
         if($validated->fails()){
             $result = [
                 'status' => 'FAIL',
@@ -239,12 +371,7 @@ class DestitutionKkController extends Controller
             return response()->json($result);
         }
 
-        $access_module = [];
-        $this->generateAccessModule($access_module, $request);
-
-        $data['user_access_name'] = $request->user_access_name;
-        $data['user_access_desc'] = $request->user_access_desc;
-        $data['access_module'] = json_encode($access_module);
+        $data = $this->payload($request);
 
         try {
             DB::beginTransaction();

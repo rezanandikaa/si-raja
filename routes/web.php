@@ -132,7 +132,7 @@ Route::group(['prefix' => env('ADMIN_LOGIN', 'administrator')], function () {
         Route::post('/master-destitution-kk/get_data', [DestitutionKkController::class, 'get_data'])->name('master.destitution_kk.get_data')->middleware('access.module:mt_destitution_kk');
         // Route::put('/master-destitution-kk/update/{id}', [DestitutionKkController::class, 'update'])->name('master.destitution_kk.update')->middleware('access.module:mt_destitution_kk');
         Route::get('/master-destitution-kk/detail/{id}', [DestitutionKkController::class, 'detail'])->name('master.destitution_kk.detail')->middleware('access.module:mt_destitution_kk');
-        // Route::delete('/master-destitution-kk/delete', [DestitutionKkController::class, 'destroy'])->name('master.destitution_kk.delete')->middleware('access.module:mt_destitution_kk');
+        Route::delete('/master-destitution-kk/delete', [DestitutionKkController::class, 'destroy'])->name('master.destitution_kk.delete')->middleware('access.module:mt_destitution_kk');
         Route::post('/master-destitution-kk/bnba/{id}/get_data', [DestitutionKkController::class, 'bnba_get_data'])->name('master.destitution_kk.bnba.get_data')->middleware('access.module:mt_destitution_kk');
 
         // Budget Year
@@ -222,8 +222,18 @@ Route::group(['prefix' => env('ADMIN_LOGIN', 'administrator')], function () {
         Route::get('/program/budget/{id}', [ProgramController::class, 'budget_list'])->name('program.budget.list')->middleware('access.module:tr_program');
         Route::get('/program/budget/{id}/insert', [ProgramController::class, 'budget_insert'])->name('program.budget.insert')->middleware('access.module:tr_program');
         Route::post('/program/budget/{id}/save', [ProgramController::class, 'budget_store'])->name('program.budget.store')->middleware('access.module:tr_program');
+        Route::get('/program/budget/{id}/edit/{budget_id}', [ProgramController::class, 'budget_edit'])->name('program.budget.edit')->middleware('access.module:tr_program');
+        Route::put('/program/budget/{id}/update/{budget_id}', [ProgramController::class, 'budget_update'])->name('program.budget.update')->middleware('access.module:tr_program');
         Route::delete('/program/budget/{id}/delete', [ProgramController::class, 'budget_destroy'])->name('program.budget.delete')->middleware('access.module:tr_program');
         Route::post('/program/budget/{id}/get_data', [ProgramController::class, 'budget_get_data'])->name('program.budget.get_data')->middleware('access.module:tr_program');
+
+        Route::get('/program/sifat-bantuan/{id}', [ProgramController::class, 'sifat_bantuan_list'])->name('program.sifat_bantuan.list')->middleware('access.module:tr_program');
+        Route::get('/program/sifat-bantuan/{id}/insert', [ProgramController::class, 'sifat_bantuan_insert'])->name('program.sifat_bantuan.insert')->middleware('access.module:tr_program');
+        Route::post('/program/sifat-bantuan/{id}/save', [ProgramController::class, 'sifat_bantuan_store'])->name('program.sifat_bantuan.store')->middleware('access.module:tr_program');
+        Route::get('/program/sifat-bantuan/{id}/edit/{sifat_bantuan_id}', [ProgramController::class, 'sifat_bantuan_edit'])->name('program.sifat_bantuan.edit')->middleware('access.module:tr_program');
+        Route::put('/program/sifat-bantuan/{id}/update/{sifat_bantuan_id}', [ProgramController::class, 'sifat_bantuan_update'])->name('program.sifat_bantuan.update')->middleware('access.module:tr_program');
+        Route::delete('/program/sifat-bantuan/{id}/delete', [ProgramController::class, 'sifat_bantuan_destroy'])->name('program.sifat_bantuan.delete')->middleware('access.module:tr_program');
+        Route::post('/program/sifat-bantuan/{id}/get_data', [ProgramController::class, 'sifat_bantuan_get_data'])->name('program.sifat_bantuan.get_data')->middleware('access.module:tr_program');
 
         // Program Realization
         Route::get('/program-realization', [ProgramRealizationController::class, 'list'])->name('program.realization.list')->middleware('access.module:tr_program_realization');

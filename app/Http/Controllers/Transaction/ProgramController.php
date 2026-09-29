@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Transaction;
 use App\Http\Controllers\Controller;
 use App\Models\Transaction\Tr_program;
 use App\Models\Transaction\Tr_program_budget;
+use App\Models\Transaction\Tr_program_sifat_bantuan;
 use App\Repositories\CompileRepository;
 use App\Repositories\Master\OrganizationRepository;
 use App\Repositories\Master\ProgramTemplateRepository;
@@ -199,6 +200,7 @@ class ProgramController extends Controller
                             </button>
                             <div class="dropdown-menu" aria-labelledby="btnGroupDrop1" style="">
                                 <a href="' . route($this->route_prefix . 'budget.list', $data->id) . '" class="dropdown-item">Sumber Pembiayaan</a>
+                                <a href="' . route($this->route_prefix . 'sifat_bantuan.list', $data->id) . '" class="dropdown-item">Sifat Bantuan</a>
                                 <a data-id="confirm-' . $data->id . '" data-url="' . route('program.confirmation') . '" class="confirm dropdown-item">Konfirmasi</a>
                                 <a href="' . route($this->route_prefix . 'edit', $data->id) . '" class="dropdown-item">Ubah</a>
                                 <a data-id="delete-' . $data->id . '" data-url="' . route('program.delete') . '" class="delete dropdown-item">Hapus</a>
@@ -213,6 +215,7 @@ class ProgramController extends Controller
                             </button>
                             <div class="dropdown-menu" aria-labelledby="btnGroupDrop1" style="">
                                 <a href="' . route($this->route_prefix . 'budget.list', $data->id) . '" class="dropdown-item">Sumber Pembiayaan</a>
+                                <a href="' . route($this->route_prefix . 'sifat_bantuan.list', $data->id) . '" class="dropdown-item">Sifat Bantuan</a>
                                 <a data-id="cancel-' . $data->id . '" data-url="' . route('program.cancel') . '" class="cancel dropdown-item">Batalkan</a>
                             </div>
                         </div>
@@ -297,11 +300,24 @@ class ProgramController extends Controller
             'name' => 'marker',
             'placeholder' => 'Geo Tag',
             'type' => 'map-marker',
-            'map_type' => 'google-map',
+            'map_type' => 'maptiler',
             'required' => true,
             'show_only' => false,
             // 'parsley' => 'data-parsley-type="email"',
             'validate_message' => 'Geo Tag wajib diisi'
+        ];
+
+        // Ditampilkan di kolom "Lokasi Tambahan" pada list Program,
+        // digabung dengan nama kecamatan di kolom "Lokasi" excel. Tidak wajib diisi.
+        $fields['lokasi_tambahan'] = [
+            'label' => 'Lokasi Tambahan',
+            'name' => 'lokasi_tambahan',
+            'placeholder' => 'Lokasi Tambahan',
+            'type' => 'text-area',
+            'maxlength' => 255,
+            'required' => false,
+            'show_only' => false,
+            'validate_message' => 'Lokasi Tambahan wajib diisi'
         ];
 
         $fields['program_uuid'] = [
@@ -324,6 +340,40 @@ class ProgramController extends Controller
             'required' => false,
             'show_only' => false,
             'validate_message' => 'Catatan wajib diisi'
+        ];
+
+        // Ditampilkan di kolom "Aktivitas Real" pada list Program. Tidak wajib diisi.
+        $fields['aktivitas_real_langsung'] = [
+            'label' => 'Aktivitas Langsung',
+            'name' => 'aktivitas_real_langsung',
+            'placeholder' => 'Silahkan isi Aktivitas Langsung',
+            'type' => 'text',
+            'maxlength' => 255,
+            'required' => false,
+            'show_only' => false,
+            'validate_message' => 'Aktivitas Langsung wajib diisi'
+        ];
+
+        $fields['aktivitas_real_tidak_langsung'] = [
+            'label' => 'Aktivitas Tidak Langsung',
+            'name' => 'aktivitas_real_tidak_langsung',
+            'placeholder' => 'Silahkan isi Aktivitas Tidak Langsung',
+            'type' => 'text',
+            'maxlength' => 255,
+            'required' => false,
+            'show_only' => false,
+            'validate_message' => 'Aktivitas Tidak Langsung wajib diisi'
+        ];
+
+        $fields['aktivitas_real_penunjang'] = [
+            'label' => 'Aktivitas Penunjang',
+            'name' => 'aktivitas_real_penunjang',
+            'placeholder' => 'Silahkan isi Aktivitas Penunjang',
+            'type' => 'text',
+            'maxlength' => 255,
+            'required' => false,
+            'show_only' => false,
+            'validate_message' => 'Aktivitas Penunjang wajib diisi'
         ];
 
         // $fields['code'] = [
@@ -456,6 +506,10 @@ class ProgramController extends Controller
         $data['budget_allocation'] = 0;
         $data['status'] = 'DRAFT';
         $data['description'] = $request->description ?? '';
+        $data['aktivitas_real_langsung'] = $request->aktivitas_real_langsung;
+        $data['aktivitas_real_tidak_langsung'] = $request->aktivitas_real_tidak_langsung;
+        $data['aktivitas_real_penunjang'] = $request->aktivitas_real_penunjang;
+        $data['lokasi_tambahan'] = $request->lokasi_tambahan ?? '';
 
         try {
             DB::beginTransaction();
@@ -560,6 +614,10 @@ class ProgramController extends Controller
         $data['district_id'] = $request->district_id ?? 0;
         $data['subdistrict_id'] = $request->subdistrict_id ?? 0;
         $data['marker'] = strtolower(($request->marker ?? 'null'));
+        $data['aktivitas_real_langsung'] = $request->aktivitas_real_langsung;
+        $data['aktivitas_real_tidak_langsung'] = $request->aktivitas_real_tidak_langsung;
+        $data['aktivitas_real_penunjang'] = $request->aktivitas_real_penunjang;
+        $data['lokasi_tambahan'] = $request->lokasi_tambahan ?? '';
 
         try {
             DB::beginTransaction();
@@ -710,24 +768,30 @@ class ProgramController extends Controller
                     $ba = number_format($data->budget_allocation, 2);
                     return "<div class='text text-right'>{$ba}</div>";
                 })
-                ->editColumn('refocusing_flag', function ($data) {
-                    return '<span class="badge light badge-' . ($data->refocusing_flag ? 'success' : 'primary') . '">' . ($data->refocusing_flag ? 'Ya' : 'Bukan') . '</span>';
+                ->editColumn('budget_stage', function ($data) {
+                    $variant = ['Murni' => 'primary', 'Pergeseran' => 'warning', 'Perubahan' => 'info'][$data->budget_stage] ?? 'default';
+                    return '<span class="badge light badge-' . $variant . '">' . ($data->budget_stage ?: '-') . '</span>';
                 })
                 ->addIndexColumn()
                 ->addColumn('action', function ($data) use ($id) {
+                    // Pagu awal (Murni) jadi dasar perhitungan tahapan lain, jadi tidak boleh diubah/dihapus.
+                    if ($data->budget_stage == 'Murni') {
+                        return '-';
+                    }
                     $btn = '
                     <div class="btn-group" role="group">
                         <button id="btnGroupDrop1" type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         Opsi
                         </button>
                         <div class="dropdown-menu" aria-labelledby="btnGroupDrop1" style="">
+                            <a href="' . route('program.budget.edit', ['id' => $id, 'budget_id' => $data->id]) . '" class="dropdown-item">Edit</a>
                             <a data-id="delete-' . $data->id . '" data-url="' . route('program.budget.delete', ['id' => $id]) . '" class="delete dropdown-item">Hapus</a>
                         </div>
                     </div>
                     ';
                     return $btn;
                 })
-                ->rawColumns(['refocusing_flag', 'action', 'budget_allocation'])
+                ->rawColumns(['budget_stage', 'action', 'budget_allocation'])
                 ->make(true);
         }
     }
@@ -757,6 +821,17 @@ class ProgramController extends Controller
             'required' => true,
             'show_only' => false,
             'validate_message' => 'Pagu wajib diisi'
+        ];
+
+        $fields['budget_stage'] = [
+            'label' => 'Anggaran',
+            'name' => 'budget_stage',
+            'placeholder' => 'Anggaran',
+            'type' => 'select',
+            'options' => ['Murni', 'Pergeseran', 'Perubahan'],
+            'required' => true,
+            'show_only' => false,
+            'validate_message' => 'Anggaran wajib diisi'
         ];
 
         // $fields['active_flag'] = [
@@ -804,7 +879,8 @@ class ProgramController extends Controller
     {
         $validated = Validator::make($request->all(), [
             'budget_source_id' => 'required',
-            'budget_allocation' => 'required'
+            'budget_allocation' => 'required',
+            'budget_stage' => 'required'
         ]);
         if ($validated->fails()) {
             $result = [
@@ -814,9 +890,22 @@ class ProgramController extends Controller
             return response()->json($result);
         }
 
+        $stage = $request->budget_stage;
+        $allocation = (float) $request->budget_allocation;
+        $budgets = $this->program_repo->getRecordsBudget('tr_program_budget.program_id = ' . (int) $id);
+
+        $stage_error = $this->validate_budget_stage($stage, $request->budget_source_id, $allocation, $budgets);
+        if ($stage_error) {
+            return response()->json([
+                'status' => 'FAIL',
+                'message' => $stage_error
+            ]);
+        }
+
         $data['program_id'] = $id;
         $data['budget_source_id'] = $request->budget_source_id;
-        $data['budget_allocation'] = (float) $request->budget_allocation;
+        $data['budget_allocation'] = $allocation;
+        $data['budget_stage'] = $stage;
 
         $program = $this->program_repo->getRecord($id);
         if ($program->status != 'DRAFT') {
@@ -825,6 +914,7 @@ class ProgramController extends Controller
 
         try {
             DB::beginTransaction();
+            // Selalu baris baru: baris tahapan sebelumnya disimpan sebagai history.
             $this->program_repo->insertRecordBudget($data);
             $this->recalculateBudgetAllocation($id);
 
@@ -849,35 +939,382 @@ class ProgramController extends Controller
         return response()->json($result);
     }
 
+    /**
+     * Aturan tahapan Anggaran. Return pesan error, atau null kalau lolos.
+     */
+    private function validate_budget_stage($stage, $budget_source_id, $allocation, $budgets)
+    {
+        // Belum ada pagu sama sekali: tahapan wajib Murni.
+        if ($budgets->isEmpty() && $stage != 'Murni') {
+            return 'Oopps, Masih Tahapan Murni';
+        }
+
+        // Pagu awal cuma boleh diinput sekali.
+        if ($stage == 'Murni' && $budgets->where('budget_stage', 'Murni')->isNotEmpty()) {
+            return 'Pagu Awal Sudah di Input';
+        }
+
+        // Pergeseran cuma mencatat ulang tahapan, pagu sumber pembiayaan itu tidak boleh berubah.
+        if ($stage == 'Pergeseran') {
+            $previous = $budgets
+                ->where('budget_source_id', $budget_source_id)
+                ->sortBy('id')
+                ->last();
+
+            if ($previous && round((float) $previous->budget_allocation, 2) != round($allocation, 2)) {
+                return 'Nilai Pagu tidak Boleh di Ubah';
+            }
+        }
+
+        return null;
+    }
+
+    public function budget_edit($id, $budget_id)
+    {
+        $record = $this->program_repo->getRecordBudget($budget_id);
+        if (!$this->budget_editable($record)) {
+            return redirect(route('program.budget.list', ['id' => $id]))->with('error', 'Data tidak dapat diubah');
+        }
+
+        $data = [
+            'fields' => $this->budget_get_form(),
+            'datas' => $record->toArray(),
+            '_be_page_title' => 'Ubah Sumber Pembiayaan',
+            '_be_page_title_desc' => 'Halaman ini untuk mengubah Sumber Pembiayaan',
+            '_be_breadcrumbs' => ['Program', 'Ubah Sumber Pembiayaan'],
+            '_be_card_title' => 'Ubah Sumber Pembiayaan',
+            '_be_btn_label' => 'Simpan',
+            '_be_btn_variant' => 'primary',
+            '_be_method' => 'PUT',
+            '_be_action' => route('program.budget.update', ['id' => $id, 'budget_id' => $budget_id]),
+            '_be_home' => route('program.budget.list', ['id' => $id])
+        ];
+
+        $this->compile_repo->make($data);
+
+        return view('backpage.program.budget.form', compact('data'));
+    }
+
+    public function budget_update(Request $request, $id, $budget_id)
+    {
+        $validated = Validator::make($request->all(), [
+            'budget_source_id' => 'required',
+            'budget_allocation' => 'required',
+            'budget_stage' => 'required'
+        ]);
+        if ($validated->fails()) {
+            $result = [
+                'status' => 'FAIL',
+                'message' => $validated->getMessageBag()->first()
+            ];
+            return response()->json($result);
+        }
+
+        $record = $this->program_repo->getRecordBudget($budget_id);
+        if (!$this->budget_editable($record)) {
+            return response()->json([
+                'status' => 'FAIL',
+                'message' => 'Data tidak dapat diubah'
+            ]);
+        }
+
+        $stage = $request->budget_stage;
+        $allocation = (float) $request->budget_allocation;
+        // Baris yang sedang diedit dibuang dari pembanding supaya tidak bentrok dengan dirinya sendiri.
+        $budgets = $this->program_repo->getRecordsBudget('tr_program_budget.program_id = ' . (int) $id)
+            ->where('id', '!=', $budget_id);
+
+        $stage_error = $this->validate_budget_stage($stage, $request->budget_source_id, $allocation, $budgets);
+        if ($stage_error) {
+            return response()->json([
+                'status' => 'FAIL',
+                'message' => $stage_error
+            ]);
+        }
+
+        $data['budget_source_id'] = $request->budget_source_id;
+        $data['budget_allocation'] = $allocation;
+        $data['budget_stage'] = $stage;
+
+        try {
+            DB::beginTransaction();
+            $this->program_repo->updateRecordBudget($budget_id, $data);
+            $this->recalculateBudgetAllocation($id);
+
+            $program = $this->program_repo->getRecord($id);
+            if ($program->budget_allocation < $program->budget_realization) {
+                throw new \Exception("Total Alokasi Anggaran tidak boleh melebihi Realisasi");
+            }
+            $result = [
+                'status' => 'OK',
+                'message' => 'Data tersimpan'
+            ];
+            logbook('Berhasil mengubah Program Budget');
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            logbook($e->getMessage(), $e->getCode());
+            $result = [
+                'status' => 'FAIL',
+                'message' => $e->getMessage()
+            ];
+        }
+        return response()->json($result);
+    }
+
+    /**
+     * Baris Murni adalah pagu awal, tidak boleh diubah/dihapus. Selain itu
+     * ikut aturan hapus: dokumen masih DRAFT atau baris hasil refocusing.
+     */
+    private function budget_editable($record)
+    {
+        if (!$record) {
+            return false;
+        }
+        if ($record->budget_stage == 'Murni') {
+            return false;
+        }
+        return $record->status == 'DRAFT' || $record->refocusing_flag;
+    }
+
     public function budget_destroy(Request $request, $id)
     {
         $budget_id = $request->id ?? 0;
         $record = $this->program_repo->getRecordBudget($budget_id);
-        if ($budget_id != 0 && ($record->status == 'DRAFT' || $record->refocusing_flag)) {
-            try {
-                DB::beginTransaction();
-                $this->program_repo->deleteRecordBudget($budget_id);
-                $this->recalculateBudgetAllocation($id);
-                $result = [
-                    'status' => 'OK',
-                    'message' => 'Data dihapus'
-                ];
-                logbook('Berhasil menghapus Program Budget');
-                DB::commit();
-            } catch (\Exception $e) {
-                DB::rollBack();
-                logbook($e->getMessage(), $e->getCode());
-                $result = [
-                    'status' => 'FAIL',
-                    'message' => $e->getMessage()
-                ];
-            }
-        } else {
+        if ($budget_id == 0 || !$this->budget_editable($record)) {
+            return response()->json([
+                'status' => 'FAIL',
+                'message' => ($record && $record->budget_stage == 'Murni')
+                    ? 'Anggaran Murni tidak dapat diubah atau dihapus'
+                    : 'Tidak ada ID yang dikonfirmasi atau status dokumen tidak sama dengan DRAFT'
+            ]);
+        }
+
+        try {
+            DB::beginTransaction();
+            $this->program_repo->deleteRecordBudget($budget_id);
+            $this->recalculateBudgetAllocation($id);
+            $result = [
+                'status' => 'OK',
+                'message' => 'Data dihapus'
+            ];
+            logbook('Berhasil menghapus Program Budget');
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            logbook($e->getMessage(), $e->getCode());
             $result = [
                 'status' => 'FAIL',
-                'message' => 'Tidak ada ID yang dikonfirmasi atau status dokumen tidak sama dengan DRAFT'
+                'message' => $e->getMessage()
             ];
         }
+        return response()->json($result);
+    }
+
+    public function sifat_bantuan_list($id)
+    {
+        $data = [
+            '_be_page_title' => 'Sifat Bantuan',
+            '_be_page_title_desc' => 'Halaman ini adalah daftar Sifat Bantuan program',
+            '_be_breadcrumbs' => ['Program', 'Sifat Bantuan'],
+            '_be_insert' => route('program.sifat_bantuan.insert', ['id' => $id]),
+            '_parent_id' => $id
+        ];
+
+        return view('backpage.program.sifat-bantuan.list', compact('data'));
+    }
+
+    public function sifat_bantuan_get_data(Request $request)
+    {
+        $id = $request->id;
+
+        $data = Tr_program_sifat_bantuan::leftJoin('mt_user as updated_by', 'tr_program_sifat_bantuan.updated_by_id', 'updated_by.id')
+            ->where('tr_program_sifat_bantuan.program_id', $id)
+            ->whereNull('tr_program_sifat_bantuan.deleted_at')
+            ->select(
+                'tr_program_sifat_bantuan.*',
+                'updated_by.name as updated_by_name'
+            );
+
+        return DataTables::eloquent($data)
+            ->editColumn('updated_at', function ($data) {
+                $ua = Carbon::parse($data->updated_at)->format('d M Y H:i');
+                return "<div class='text text-center'>$ua</div>";
+            })
+            ->addColumn('action', function ($data) {
+                $edit = route('program.sifat_bantuan.edit', ['id' => $data->program_id, 'sifat_bantuan_id' => $data->id]);
+                $delete = route('program.sifat_bantuan.delete', ['id' => $data->program_id]);
+
+                return '<div class="btn-group">
+                            <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fa fa-ellipsis-h"></i>
+                            </button>
+                            <div class="dropdown-menu">
+                                <a href="' . $edit . '" class="dropdown-item">Ubah</a>
+                                <a href="javascript:void(0)" class="dropdown-item delete" data-id="delete-' . $data->id . '" data-url="' . $delete . '">Hapus</a>
+                            </div>
+                        </div>';
+            })
+            ->rawColumns(['updated_at', 'action'])
+            ->make(true);
+    }
+
+    public function sifat_bantuan_get_form()
+    {
+        $fields = [];
+
+        $fields['sifat_bantuan'] = [
+            'label' => 'Sifat Bantuan',
+            'name' => 'sifat_bantuan',
+            'placeholder' => 'Sifat Bantuan',
+            'type' => 'text-area',
+            'required' => true,
+            'show_only' => false,
+            'maxlength' => 255,
+            'validate_message' => 'Sifat Bantuan wajib diisi'
+        ];
+
+        return $fields;
+    }
+
+    public function sifat_bantuan_insert($id)
+    {
+        $data = [];
+        $forms = $this->sifat_bantuan_get_form();
+
+        $data = [
+            'fields' => $forms,
+            'datas' => [],
+            '_be_page_title' => 'Tambah Sifat Bantuan',
+            '_be_page_title_desc' => 'Halaman ini untuk menambah Sifat Bantuan',
+            '_be_breadcrumbs' => ['Program', 'Tambah Sifat Bantuan'],
+            '_be_card_title' => 'Tambah Sifat Bantuan',
+            '_be_btn_label' => 'Simpan',
+            '_be_btn_variant' => 'primary',
+            '_be_method' => 'POST',
+            '_be_action' => route('program.sifat_bantuan.store', ['id' => $id]),
+            '_be_home' => route('program.sifat_bantuan.list', ['id' => $id])
+        ];
+
+        $this->compile_repo->make($data);
+
+        return view('backpage.program.sifat-bantuan.form', compact('data'));
+    }
+
+    public function sifat_bantuan_store(Request $request, $id)
+    {
+        $validate = $this->compile_repo->validateRule($this->sifat_bantuan_get_form());
+        $request->validate($validate);
+
+        DB::beginTransaction();
+        try {
+            Tr_program_sifat_bantuan::create([
+                'program_id' => $id,
+                'sifat_bantuan' => $request->sifat_bantuan,
+            ]);
+
+            DB::commit();
+            $result = [
+                'status' => 'OK',
+                'message' => 'Sifat Bantuan berhasil disimpan',
+                'redirect' => route('program.sifat_bantuan.list', ['id' => $id])
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            logbook($e->getMessage(), $e->getCode());
+            $result = [
+                'status' => 'FAIL',
+                'message' => $e->getMessage()
+            ];
+        }
+
+        return response()->json($result);
+    }
+
+    public function sifat_bantuan_edit($id, $sifat_bantuan_id)
+    {
+        $record = Tr_program_sifat_bantuan::where('program_id', $id)->find($sifat_bantuan_id);
+
+        if (!$record) {
+            return redirect(route('program.sifat_bantuan.list', ['id' => $id]))->with('error', 'Data tidak dapat ditemukan');
+        }
+
+        $data = [
+            'fields' => $this->sifat_bantuan_get_form(),
+            'datas' => $record->toArray(),
+            '_be_page_title' => 'Ubah Sifat Bantuan',
+            '_be_page_title_desc' => 'Halaman ini untuk mengubah Sifat Bantuan',
+            '_be_breadcrumbs' => ['Program', 'Ubah Sifat Bantuan'],
+            '_be_card_title' => 'Ubah Sifat Bantuan',
+            '_be_btn_label' => 'Simpan',
+            '_be_btn_variant' => 'primary',
+            '_be_method' => 'PUT',
+            '_be_action' => route('program.sifat_bantuan.update', ['id' => $id, 'sifat_bantuan_id' => $sifat_bantuan_id]),
+            '_be_home' => route('program.sifat_bantuan.list', ['id' => $id])
+        ];
+
+        $this->compile_repo->make($data);
+
+        return view('backpage.program.sifat-bantuan.form', compact('data'));
+    }
+
+    public function sifat_bantuan_update(Request $request, $id, $sifat_bantuan_id)
+    {
+        $validate = $this->compile_repo->validateRule($this->sifat_bantuan_get_form());
+        $request->validate($validate);
+
+        DB::beginTransaction();
+        try {
+            $record = Tr_program_sifat_bantuan::where('program_id', $id)->find($sifat_bantuan_id);
+            if (!$record) {
+                throw new \Exception('Data tidak dapat ditemukan');
+            }
+
+            $record->update(['sifat_bantuan' => $request->sifat_bantuan]);
+
+            DB::commit();
+            $result = [
+                'status' => 'OK',
+                'message' => 'Sifat Bantuan berhasil diubah',
+                'redirect' => route('program.sifat_bantuan.list', ['id' => $id])
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            logbook($e->getMessage(), $e->getCode());
+            $result = [
+                'status' => 'FAIL',
+                'message' => $e->getMessage()
+            ];
+        }
+
+        return response()->json($result);
+    }
+
+    public function sifat_bantuan_destroy(Request $request, $id)
+    {
+        DB::beginTransaction();
+        try {
+            $record = Tr_program_sifat_bantuan::where('program_id', $id)->find($request->id);
+            if (!$record) {
+                throw new \Exception('Data tidak dapat ditemukan');
+            }
+
+            $record->delete();
+
+            DB::commit();
+            $result = [
+                'status' => 'OK',
+                'message' => 'Sifat Bantuan berhasil dihapus'
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            logbook($e->getMessage(), $e->getCode());
+            $result = [
+                'status' => 'FAIL',
+                'message' => $e->getMessage()
+            ];
+        }
+
         return response()->json($result);
     }
 
@@ -886,9 +1323,12 @@ class ProgramController extends Controller
         $cond = 'tr_program_budget.program_id = "' . $id . '"';
         $records = $this->program_repo->getRecordsBudget($cond);
 
+        // Pagu program = jumlah pagu TERAKHIR tiap sumber pembiayaan. Baris tahapan
+        // sebelumnya tetap tampil sebagai history, tapi tidak ikut dihitung supaya
+        // pagu lama tidak dobel dengan pagu penggantinya.
         $budget_allocation = 0;
-        foreach ($records as $record) {
-            $budget_allocation += (float) $record->budget_allocation;
+        foreach ($records->groupBy('budget_source_id') as $per_source) {
+            $budget_allocation += (float) $per_source->sortBy('id')->last()->budget_allocation;
         }
 
         // update

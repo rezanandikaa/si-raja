@@ -15,13 +15,15 @@
 
     <script>
         $(document).ready(function() {
-            $(document).ajaxStart(function() {
-                $(".loading-screen-map").show();
-            });
-
-            $(document).ajaxStop(function() {
-                $(".loading-screen-map").hide();
-            });
+            // Spinner #loading-screen-map ada di dalam #map-container, jadi hilang sendiri
+            // saat Highcharts sukses render. Jalur gagal harus ditutup eksplisit, kalau
+            // tidak spinner bertahan selamanya.
+            function showMapError(message) {
+                $("#map-container").html(
+                    '<div class="text-muted d-flex align-items-center justify-content-center" ' +
+                    'style="height:100%;padding:1rem;text-align:center;font-size:13px">' + message + '</div>'
+                );
+            }
 
             // Data untuk chart pie
             $.ajax({
@@ -36,6 +38,9 @@
                 success: function(data) {
                     createMapChart(data);
                 },
+                error: function(xhr) {
+                    showMapError('Gagal memuat data peta (' + (xhr.status || 'jaringan') + '). Muat ulang halaman.');
+                }
             });
 
             function createMapChart(data) {
@@ -53,6 +58,11 @@
                 // Menentukan nilai terendah dan tertinggi
                 var minValue = 0;
                 var maxValue = 100000;
+
+                if (!data || !Array.isArray(data.map) || data.map.length === 0) {
+                    showMapError('Data peta belum tersedia.');
+                    return;
+                }
 
                 // Mengambil GeoJSON dari URL menggunakan jQuery
                 $.getJSON(geojsonUrl, async function(geojson) {
@@ -198,6 +208,8 @@
                             }
                         },
                     });
+                }).fail(function() {
+                    showMapError('Gagal memuat peta. Periksa koneksi lalu muat ulang halaman.');
                 });
             }
         });

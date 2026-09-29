@@ -134,8 +134,7 @@ class Menu
             'class' => 'fa fa-download',
             'has_child' => true,
             'childs' => [
-                ['sub_title' => 'Laporan Program', 'id' => 'tr_download', 'action' => 'download.report', 'action_prop' => ['report_name' => 'program'], 'active_flag' => false],
-                ['sub_title' => 'Laporan Realisasi', 'id' => 'tr_download', 'action' => 'download.report', 'action_prop' => ['report_name' => 'realization'], 'active_flag' => false],
+                ['sub_title' => 'Laporan Kegiatan', 'id' => 'tr_download', 'action' => 'download.report', 'action_prop' => ['report_name' => 'program'], 'active_flag' => false],
             ]
         ];
         array_push($menus, $menu);

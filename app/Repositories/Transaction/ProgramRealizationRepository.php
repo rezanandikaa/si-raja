@@ -248,7 +248,7 @@ class ProgramRealizationRepository
                 'tr_program.program as program_program',
                 'tr_program.activity as program_activity',
                 'tr_program.sub_activity as program_sub_activity',
-                'tr_program.budget_allocation as program_budget_allocation',
+                DB::raw('COALESCE(NULLIF(tr_program_realization.budget_allocation, 0), tr_program.budget_allocation) as program_budget_allocation'),
                 'tr_program.organization_id as program_organization_id',
                 'mt_budget_year.name as budget_year_name',
                 'mt_organization.name as organization_name',

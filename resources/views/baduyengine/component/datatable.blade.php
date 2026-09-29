@@ -59,7 +59,7 @@ $(document).ready(function(){
                 targets: '_all'
             }
         ],
-        order: [[ 1, "desc" ]]
+        order: {!! json_encode($datatable['order'] ?? [[1, "desc"]]) !!}
     });
 
     $('.js-basic-datatable tbody').on('click', 'a.delete', function () {

@@ -2,19 +2,14 @@
 $datatable = [];
 
 $datatable['json_data'] = [
-    ["data" => "budget_source_name", "name" => "mt_budget_source.name"],
-    ["data" => "budget_allocation", "name" => "tr_program_budget.budget_allocation"],
-    ["data" => "budget_stage", "name" => "tr_program_budget.budget_stage"],
+    ["data" => "sifat_bantuan", "name" => "tr_program_sifat_bantuan.sifat_bantuan"],
     ["data" => "updated_by_name", "name" => "updated_by.name"],
-    ["data" => "updated_at", "name" => "tr_program_budget.updated_at"],
+    ["data" => "updated_at", "name" => "tr_program_sifat_bantuan.updated_at"],
     ["data" => "action", "name" => "action", "orderable" => false, "searchable" => false],
 ];
 
-// Urut dari yang paling lama: Murni -> Pergeseran -> Perubahan. Index 4 = kolom "Dibuat Pada".
-$datatable['order'] = [[4, "asc"]];
-
-$datatable['route_data'] = route('program.budget.get_data', ['id' => $data['_parent_id']]);
-$datatable['route_insert'] = route('program.budget.insert', ['id' => $data['_parent_id']]);
+$datatable['route_data'] = route('program.sifat_bantuan.get_data', ['id' => $data['_parent_id']]);
+$datatable['route_insert'] = route('program.sifat_bantuan.insert', ['id' => $data['_parent_id']]);
 $datatable['route_back'] = route('program.list');
 
 @endphp
@@ -57,17 +52,6 @@ $(document).ready(function () {
                         <li class="breadcrumb-item active">{{ $data['_be_page_title'] }}</li>
                     </ul>
                 </div>
-                {{-- <div class="col-lg-6 col-md-6 col-sm-12">
-                    <div class="d-flex flex-row-reverse">
-                        <div class="page_action">
-                            <button type="button" class="btn btn-primary"><i class="fa fa-download"></i> Download report</button>
-                            <button type="button" class="btn btn-secondary"><i class="fa fa-send"></i> Send report</button>
-                        </div>
-                        <div class="p-2 d-flex">
-
-                        </div>
-                    </div>
-                </div> --}}
             </div>
         </div>
 
@@ -82,11 +66,9 @@ $(document).ready(function () {
                             <table class="table table-hover table-custom dataTable js-basic-datatable" width="100%">
                                 <thead>
                                     <tr>
-                                        <th>Sumber Pembiayaan</th>
-                                        <th>Pagu</th>
-                                        <th>Anggaran</th>
-                                        <th>Dibuat Oleh</th>
-                                        <th>Dibuat Pada</th>
+                                        <th>Sifat Bantuan</th>
+                                        <th>Diubah Oleh</th>
+                                        <th>Diubah Pada</th>
                                         <th>Opsi</th>
                                     </tr>
                                 </thead>

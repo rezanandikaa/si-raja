@@ -26,8 +26,24 @@
                         {{$readonly}} />
                 </div>
                 @break
-            
-            
+
+            {{-- date (picker-nya diinisialisasi di component-js.form) --}}
+            @case('date')
+                <div class="form-group">
+                    <label for="{{$key}}">{{$item['label']}} {!!(isset($item['required']) ? ($item['required'] == true ? "<span class='text-danger'>*</span>":''): '')!!}</label>
+                    <input type="text"
+                        id="{{$key}}"
+                        name="{{$item['name']}}"
+                        class="form-control be-datepicker"
+                        placeholder="{{$item['placeholder']}}"
+                        value="{{$item['value'] ?? ''}}"
+                        {{(isset($item['required']) ? ($item['required'] == true ? 'required' : ''): '')}}
+                        {!! $item['parsley'] ?? '' !!}
+                        {{$readonly}} />
+                </div>
+                @break
+
+
             {{-- hidden --}}
             @case('hidden')
                 <div class="form-group">
@@ -233,7 +249,14 @@
                         <select class="multiselect multiselect-custom" id="{{$key}}" name="{{$key}}" {{(isset($item['required']) ? ($item['required'] == true ? 'required' : ''): '')}}>
                             <option value="">-- Pilih --</option>
                             @foreach ($item['options'] as $option)
-                                <option value="{{$option}}" {!! (isset($item['value']) ? ($item['value'] == $option ? 'selected="selected"':''):'') !!}>{{$option}}</option>
+                                @php
+                                    // Opsi boleh berupa array ['value'=>.., 'label'=>..] supaya teks yang
+                                    // dibaca user bisa beda dari nilai yang disimpan. Contoh: label
+                                    // "Hitung Jumlah Data (COUNT)" tetap menyimpan "COUNT".
+                                    $opt_value = is_array($option) ? ($option['value'] ?? '') : $option;
+                                    $opt_label = is_array($option) ? ($option['label'] ?? $opt_value) : $option;
+                                @endphp
+                                <option value="{{$opt_value}}" {!! (isset($item['value']) ? ($item['value'] == $opt_value ? 'selected="selected"':''):'') !!}>{{$opt_label}}</option>
                             @endforeach
                         </select>
                     </div>

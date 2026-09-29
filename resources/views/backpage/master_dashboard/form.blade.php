@@ -61,36 +61,24 @@ $(document).ready(function(){
         });
     });
 
-    // $('.be-select-data').on('mousedown', function() {
-    //     var select = $(this);
-    //     var dataTable = select.attr('data-table');
-    //     var dataCondition = select.attr('data-condition');
-    //     $.ajax({
-    //         headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')},
-    //         url: '{{ route("ajax.data_select") }}',
-    //         method: 'POST',
-    //         dataType: 'json',
-    //         data: {table: dataTable, condition: dataCondition},
-    //         success: function(data) {
-    //             // Data telah berhasil diambil
-    //             select.empty();
+    // 'Kolom yang Dijumlahkan' (value) cuma dibaca AjaxController::chart kalau
+    // Jenis Perhitungan = SUM. Saat COUNT kolom itu diabaikan, jadi jangan diminta
+    // ke user. Form MAP tidak punya pilihan SUM, jadi dibiarkan apa adanya.
+    function toggleKolomJumlah() {
+        var $jenis = $('#type');
+        if (!$jenis.length || !$jenis.find('option[value="SUM"]').length) {
+            return;
+        }
 
-    //             select.append($('<option></option>')
-    //                 .attr('value', "")
-    //                 .text("-- Pilih --")
-    //             );
-    //             $.each(data, function(key, value) {
-    //                 select.append($('<option></option>')
-    //                     .attr('value', value.id)
-    //                     .text(value.label)
-    //                 );
-    //             });
-    //         },
-    //         error: function() {
-    //             console.log('Terjadi kesalahan dalam permintaan AJAX');
-    //         }
-    //     });
-    // });
+        var sum = $jenis.val() === 'SUM';
+        $('#value').closest('.form-group').toggle(sum);
+        // Elemen yang cuma disembunyikan tetap diblokir validasi required di browser,
+        // jadi atributnya harus dilepas, bukan sekadar di-hide.
+        $('#value').prop('required', sum);
+    }
+
+    $('#type').on('change', toggleKolomJumlah);
+    toggleKolomJumlah();
 });
 </script>
 @endsection

@@ -20,5 +20,18 @@ class PreferenceSeeder extends Seeder
             'created_by_id' => 1,
             'updated_by_id' => 1
         ]);
+
+        // Ambang persentil untuk daftar P3KE. Baris dengan persentil di atas nilai
+        // ini disembunyikan dari tabel (lihat DestitutionKkRepository::getRecord).
+        // Kalau baris ini tidak ada, get_preference() jatuh ke default 2 dan
+        // hampir semua data hasil input baru ikut hilang dari daftar.
+        // 20 sejalan dengan warna progress bar di detail.blade.php.
+        Sy_preference::create([
+            'name' => 'BATAS PERSENTIL DATA P3KE',
+            'key' => 'default_percentile',
+            'value' => '20',
+            'created_by_id' => 1,
+            'updated_by_id' => 1
+        ]);
     }
 }

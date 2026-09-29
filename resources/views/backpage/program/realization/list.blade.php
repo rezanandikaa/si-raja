@@ -19,6 +19,7 @@ $datatable['json_data'] = [
     ["data" => "target", "name" => "tr_program_realization.target"],
     ["data" => "implementation_obstacle", "name" => "tr_program_realization.implementation_obstacle"],
     ["data" => "benefit", "name" => "tr_program_realization.benefit"],
+    ["data" => "jenis_bantuan", "name" => "tr_program_realization.jenis_bantuan"],
     ["data" => "duration_note", "name" => "tr_program_realization.duration_note"],
     ["data" => "updated_by_name", "name" => "updated_by.name"],
     ["data" => "updated_at", "name" => "tr_program.updated_at"],
@@ -36,7 +37,6 @@ $datatable['route_insert'] = route('program.realization.insert');
 <link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/dataTables.bootstrap4.min.css') }}">
 <link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/fixedeader/dataTables.fixedcolumns.bootstrap4.min.css') }}">
 <link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/fixedeader/dataTables.fixedheader.bootstrap4.min.css') }}">
-<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
 @endsection
 
 @section('vendor-js')
@@ -46,7 +46,6 @@ $datatable['route_insert'] = route('program.realization.insert');
 <script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.colVis.min.js') }}"></script>
 <script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.html5.min.js') }}"></script>
 <script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.print.min.js') }}"></script>
-<script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
 
 {{-- @include('baduyengine.component.datatable', $datatable) --}}
 <script>
@@ -54,7 +53,6 @@ $datatable['route_insert'] = route('program.realization.insert');
     'use strict'
 
     var table = $('.js-basic-datatable').DataTable({
-        responsive: true,
         processing: true,
         serverSide: true,
         language: {
@@ -75,6 +73,7 @@ $datatable['route_insert'] = route('program.realization.insert');
             [10, 25, 50, "All"]
         ],
         dom: 'Bfrtlip',
+        scrollX: true,
         buttons: [
             @if (isset($datatable['route_back']))
             {
@@ -350,6 +349,7 @@ $(document).ready(function () {
                                         <th>Sasaran Penerima Manfaat</th>
                                         <th>Kendala Pelaksanaan</th>
                                         <th>Besaran Manfaat</th>
+                                        <th>Jenis Bantuan</th>
                                         <th>Durasi Pemberian Bantuan</th>
                                         <th>Diubah oleh</th>
                                         <th>Diubah pada</th>

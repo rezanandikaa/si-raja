@@ -484,6 +484,14 @@ class CompileRepository
                     }
                     break;
 
+                case 'map-marker':
+                    if (isset($field['required']) && $field['required']) {
+                        array_push($val, 'required');
+                        // form kirim string "null" kalau peta tidak diklik
+                        array_push($val, 'not_in:null');
+                    }
+                    break;
+
                 default:
                     //
                     break;

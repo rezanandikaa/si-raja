@@ -8,6 +8,7 @@ use App\Models\Transaction\Tr_program_realization;
 use App\Models\Transaction\Tr_program_realization_bnba;
 use App\Repositories\CompileRepository;
 use App\Repositories\System\AttachmentRepository;
+use App\Repositories\System\OptionRepository;
 use App\Repositories\Transaction\ProgramRealizationRepository;
 use App\Repositories\Transaction\ProgramRepository;
 use Carbon\Carbon;
@@ -26,18 +27,21 @@ class ProgramRealizationController extends Controller
     protected $program_realization_repo;
     protected $program_repo;
     protected $attachment_repo;
+    protected $option_repo;
 
     public function __construct(
         CompileRepository $compile_repo,
         ProgramRealizationRepository $program_realization_repo,
         ProgramRepository $program_repo,
-        AttachmentRepository $attachment_repo
+        AttachmentRepository $attachment_repo,
+        OptionRepository $option_repo
     ) {
         $this->route_prefix = 'program.realization.';
         $this->compile_repo = $compile_repo;
         $this->program_realization_repo = $program_realization_repo;
         $this->program_repo = $program_repo;
         $this->attachment_repo = $attachment_repo;
+        $this->option_repo = $option_repo;
     }
 
     public function list()
@@ -62,19 +66,32 @@ class ProgramRealizationController extends Controller
         $records = $records->get();
 
         $collection = collect($records);
-        $tw = $collection->groupBy('quarterly')->map(function ($group) {
+
+        // Kartu dipecah per Strategi OPPKPE, bukan per triwulan.
+        // Relasinya: tr_program.program_goal_id -> sy_option dengan code 'strategy_program'
+        // (sudah di-join sebagai strategy_program_name di getDataTable()).
+        $per_strategi = $collection->groupBy('strategy_program_name')->map(function ($group) {
             return $group->sum('budget_realization');
         });
-        $tw_1 = isset($tw[1]) ? $tw[1] : 0;
-        $tw_2 = isset($tw[2]) ? $tw[2] : 0;
-        $tw_3 = isset($tw[3]) ? $tw[3] : 0;
-        $tw_4 = isset($tw[4]) ? $tw[4] : 0;
 
-        $summary_data = [
-            ['title' => 'Triwulan #1', 'value' => number_format(round($tw_1, 0)), 'description' => 'Total Realisasi', 'class' => 'col-lg-3 col-md-6 col-sm-6'],
-            ['title' => 'Triwulan #2', 'value' => number_format(round($tw_2, 0)), 'description' => 'Total Realisasi', 'class' => 'col-lg-3 col-md-6 col-sm-6'],
-            ['title' => 'Triwulan #3', 'value' => number_format(round($tw_3, 0)), 'description' => 'Total Realisasi', 'class' => 'col-lg-3 col-md-6 col-sm-6'],
-            ['title' => 'Triwulan #4', 'value' => number_format(round($tw_4, 0)), 'description' => 'Total Realisasi', 'class' => 'col-lg-3 col-md-6 col-sm-6'],
+        // Daftar kartu diambil dari master, bukan dari hasil query, supaya strategi
+        // yang realisasinya masih 0 tetap tampil sebagai kartu (bukan hilang).
+        $summary_data = [];
+        foreach ($this->option_repo->getRecordsByCode('strategy_program') as $option) {
+            $summary_data[] = [
+                'title' => $option->value,
+                'value' => number_format(round($per_strategi->get($option->value, 0), 0)),
+                'description' => 'Total Realisasi',
+                'class' => 'col-lg-3 col-md-6 col-sm-6',
+            ];
+        }
+
+        // Total = seluruh realisasi Program OPPKPE, lintas strategi.
+        $summary_data[] = [
+            'title' => 'Total Realisasi',
+            'value' => number_format(round($collection->sum('budget_realization'), 0)),
+            'description' => 'Semua Strategi OPPKPE',
+            'class' => 'col-lg-3 col-md-6 col-sm-6',
         ];
         $data = [
             '_be_page_title' => 'Realisasi Program',
@@ -200,9 +217,9 @@ class ProgramRealizationController extends Controller
             'name' => 'budget_allocation',
             'placeholder' => 'Pagu',
             'type' => 'decimal',
-            'required' => false,
-            'show_only' => true,
-            'read_only' => true,
+            'required' => true,
+            'show_only' => false,
+            'read_only' => false,
             'validate_message' => 'Pagu wajib diisi'
         ];
 
@@ -217,14 +234,14 @@ class ProgramRealizationController extends Controller
         ];
 
         $fields['target'] = [
-            'label' => 'Sasaran Penerima Manfaat',
+            'label' => 'Jumlah Sasaran Penerima Manfaat',
             'name' => 'target',
-            'placeholder' => 'Sasaran Penerima Manfaat',
+            'placeholder' => 'Jumlah Sasaran Penerima Manfaat',
             'type' => 'text-area',
             'required' => true,
             'show_only' => false,
             'maxlength' => 1000,
-            'validate_message' => 'Sasaran Penerima Manfaat wajib diisi'
+            'validate_message' => 'Jumlah Sasaran Penerima Manfaat wajib diisi'
         ];
 
         $fields['implementation_obstacle'] = [
@@ -247,6 +264,17 @@ class ProgramRealizationController extends Controller
             'show_only' => false,
             'maxlength' => 1000,
             'validate_message' => 'Besaran Manfaat wajib diisi'
+        ];
+
+        $fields['jenis_bantuan'] = [
+            'label' => 'Jenis Bantuan',
+            'name' => 'jenis_bantuan',
+            'placeholder' => 'Jenis Bantuan',
+            'type' => 'text-area',
+            'required' => true,
+            'show_only' => false,
+            'maxlength' => 1000,
+            'validate_message' => 'Jenis Bantuan wajib diisi'
         ];
 
         $fields['duration_note'] = [
@@ -327,11 +355,12 @@ class ProgramRealizationController extends Controller
         $data['program_id'] = $request->program_id;
         $data['program_goal_id'] = $record->program_goal_id;
         $data['quarterly'] = $request->quarterly;
-        $data['budget_allocation'] = $record->budget_allocation;
+        $data['budget_allocation'] = $request->filled('budget_allocation') ? $request->budget_allocation : $record->budget_allocation;
         $data['budget_realization'] = $request->budget_realization;
         $data['target'] = $request->target ?? '';
         $data['implementation_obstacle'] = $request->implementation_obstacle ?? '';
         $data['benefit'] = $request->benefit ?? '';
+        $data['jenis_bantuan'] = $request->jenis_bantuan ?? '';
         $data['duration_note'] = $request->duration_note ?? '';
 
         DB::beginTransaction();
@@ -348,7 +377,7 @@ class ProgramRealizationController extends Controller
             $total_realization = $this->program_realization_repo->getTotalRealizationByProgramId($data['program_id']);
             $this->program_repo->updateRecord($data['program_id'], ['budget_realization' => $total_realization]);
 
-            if ($program->budget_allocation < $total_realization || $program->budget_allocation < $data['budget_realization']) {
+            if ($data['budget_allocation'] < $total_realization || $data['budget_allocation'] < $data['budget_realization']) {
                 throw new \Exception("Realisasi Melebihi Pagu / Anggaran");
             }
 
@@ -385,7 +414,7 @@ class ProgramRealizationController extends Controller
             return redirect(route($this->route_prefix . 'list'))->with('error', 'Tidak dapat menemukan ID');
         }
         $forms = $this->get_form();
-        $datas['budget_allocation'] = $record->program_budget_allocation;
+        $datas['budget_allocation'] = $record->budget_allocation ?: $record->program_budget_allocation;
 
         $data = [
             'fields' => $forms,
@@ -428,11 +457,12 @@ class ProgramRealizationController extends Controller
         $data['program_id'] = $request->program_id;
         $data['program_goal_id'] = $program->program_goal_id;
         $data['quarterly'] = $request->quarterly;
-        $data['budget_allocation'] = $program->budget_allocation;
+        $data['budget_allocation'] = $request->filled('budget_allocation') ? $request->budget_allocation : $program->budget_allocation;
         $data['budget_realization'] = $request->budget_realization;
         $data['target'] = $request->target ?? '';
         $data['implementation_obstacle'] = $request->implementation_obstacle ?? '';
         $data['benefit'] = $request->benefit ?? '';
+        $data['jenis_bantuan'] = $request->jenis_bantuan ?? '';
         $data['duration_note'] = $request->duration_note ?? '';
 
         DB::beginTransaction();
@@ -457,7 +487,7 @@ class ProgramRealizationController extends Controller
             $total_realization = $this->program_realization_repo->getTotalRealizationByProgramId($data['program_id']);
             $this->program_repo->updateRecord($data['program_id'], ['budget_realization' => $total_realization]);
 
-            if ($program->budget_allocation < $total_realization || $program->budget_allocation < $data['budget_realization']) {
+            if ($data['budget_allocation'] < $total_realization || $data['budget_allocation'] < $data['budget_realization']) {
                 throw new \Exception("Realisasi Melebihi Pagu / Anggaran");
             }
 

@@ -67,6 +67,8 @@
         }
         .map-leaf {
             height: 400px;
+            position: relative;
+            overflow: hidden;
         }
         .leaflet-top, .leaflet-bottom {
             z-index: 850 !important;
@@ -80,6 +82,22 @@
         .google-maps-pac-input {background-color: #fff;font-family: Roboto;font-size: 15px;font-weight: 300;margin-left: 12px;padding: 0 11px 0 13px;text-overflow: ellipsis;width: 300px;}
         .google-maps-pac-input:focus {border-color: #4d90fe;}
         .pac-container {font-family: Roboto;}
+        /* MapTiler map styles */
+        .map-leaf .maplibregl-map, .map-leaf .maptiler-map {
+            height: 100%;
+            width: 100%;
+        }
+        .map-leaf .maplibregl-canvas {
+            outline: none;
+        }
+        /* Fix: Ensure Bootstrap Multiselect dropdown menus appear above MapTiler map */
+        .multiselect-container.dropdown-menu {
+            z-index: 1060 !important;
+            position: absolute !important;
+        }
+        .c_multiselect .btn-group.open {
+            z-index: 1050 !important;
+        }
         /* #type-selector {color: #fff;background-color: #4d90fe;padding: 5px 11px 0px 11px;}
         #type-selector label {font-family: Roboto;font-size: 13px;font-weight: 300;}
         #target { width: 345px; } */

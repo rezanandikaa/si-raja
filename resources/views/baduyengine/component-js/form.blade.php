@@ -206,6 +206,16 @@ $(document).ready(function(){
 });
 </script>
 
+<script type="text/javascript">
+window.__geojsonCache = window.__geojsonCache || {};
+function fetchGeojsonCached(url) {
+    if (!window.__geojsonCache[url]) {
+        window.__geojsonCache[url] = fetch(url).then(response => response.json());
+    }
+    return window.__geojsonCache[url];
+}
+</script>
+
 @forelse ($data['fields'] as $key => $item)
 
         @switch($item['type'])
@@ -217,6 +227,22 @@ $(document).ready(function(){
                             enableFiltering: true,
                             enableCaseInsensitiveFiltering: true,
                             maxHeight: 400,
+                        });
+                    });
+                </script>
+                @break
+            @case('date')
+                <script>
+                    $(document).ready(function () {
+                        // Plugin dimuat oleh view form masing-masing. Kalau tidak dimuat,
+                        // biarkan sebagai input teks biasa supaya form tetap jalan.
+                        if (!$.fn.datepicker) { return; }
+                        $("#{{ $key }}").datepicker({
+                            format: 'yyyy-mm-dd',
+                            autoclose: true,
+                            todayHighlight: true,
+                            language: 'id',
+                            orientation: 'bottom auto',
                         });
                     });
                 </script>
@@ -364,164 +390,133 @@ $(document).ready(function(){
                             window.mainLocation = mainLocation;
                             window.googleMap = googleMap;
                         });
-                    // function initMap() {
-                    //     var markers = [];
-                    //     var kablebak = {lat: -6.360093328432204, lng: 106.24607078004048};
-                    //     var map = new google.maps.Map(document.getElementById('map-{{ $key }}'), {
-                    //         zoom: 15,
-                    //         center: kablebak
-                    //     });
-                    //     var kmzUrl = "{{ asset('html/assets/kml/batas-kecamatan.kmz') }}";
-
-                    //     var ctaLayer = new google.maps.KmlLayer({
-                    //         url: kmzUrl,
-                    //         map: map
-                    //     });
-
-                    //     google.maps.event.addListener(map, "click", function (event) {
-                    //         var latitude = event.latLng.lat();
-                    //         var longitude = event.latLng.lng();
-                    //         for (i=0; i < markers.length; i++) {
-                    //             markers[i].setMap(null);
-                    //         }
-                    //         var marker = new google.maps.Marker({
-                    //             position: {lat: latitude, lng: longitude},
-                    //             title: 'Lokasi kegiatan',
-                    //             map: map,
-                    //             draggable: true
-                    //         });	
-
-                    //         jQuery('#t_latitude').val(event.latLng.lat());
-                    //         jQuery('#t_longitude').val(event.latLng.lng());
-                    //         jQuery('#latitude').val(event.latLng.lat());
-                    //         jQuery('#longitude').val(event.latLng.lng());
-
-                    //         markers.push(marker);
-
-                    //         google.maps.event.addListener(marker, 'click', function () {
-                    //             map.panTo(marker.getPosition());
-                    //         });
-                    //     });
-
-
-                    //     //Function searching gmap
-                    //     var input = document.getElementById('pac-input');
-                    //     var searchBox = new google.maps.places.SearchBox(input);
-                    //     map.controls[google.maps.ControlPosition.TOP_CENTER].push(input);
-                    //     map.addListener('bounds_changed', function() {
-                    //         searchBox.setBounds(map.getBounds());
-                    //     });
-                    //     searchBox.addListener('places_changed', function() {
-                    //         var places = searchBox.getPlaces();
-                    //         if (places.length == 0) {
-                    //             return;
-                    //         }
-
-                    //         var bounds = new google.maps.LatLngBounds();
-                    //         places.forEach(function(place) {
-                    //             if (!place.geometry) {
-                    //                 console.log("Returned place contains no geometry");
-                    //                 return;
-                    //             }
-
-                    //             if (place.geometry.viewport) {
-                    //                 bounds.union(place.geometry.viewport);
-                    //             } else {
-                    //                 bounds.extend(place.geometry.location);
-                    //             }
-                    //         });
-                    //         map.fitBounds(bounds);
-                    //     });
-
-
-                    //     //Map default lebak
-                    //     function map_lebak() {
-                    //         document.getElementById("pac-input").value = 'Lebak Regency, Banten, Indonesia';
-                    //         var geocoder = new google.maps.Geocoder();
-                    //         geocoder.geocode(
-                    //             {'address': jQuery("#pac-input").val()}, 
-                    //             function(results, status) { 
-                    //                 if (status == google.maps.GeocoderStatus.OK) { 
-                    //                     var bounds = new google.maps.LatLngBounds();
-                    //                     bounds.extend(results[0].geometry.location);
-                    //                     map.fitBounds(bounds);
-                    //                     map.setZoom(11);
-                    //                 } 
-                    //                 else {
-                    //                     alert("Not found: " + status); 
-                    //                 } 
-                    //             }
-                    //         );
-                    //         for (i=0; i < markers.length; i++) {
-                    //             markers[i].setMap(null);
-                    //         }
-                    //         jQuery('#alamatkegiatan').val('');
-                    //         jQuery('#t_latitude').val('');
-                    //         jQuery('#t_longitude').val('');
-                    //         jQuery('#latitude').val('');
-                    //         jQuery('#longitude').val('');
-                    //     }
-                    // }
-
-                            //Action change kecamatan
-                        // document.getElementById("lokasikecamatan_id").addEventListener("change", map_kecamatan, false);
-                        // function map_kecamatan() {
-                        //     if(jQuery("#lokasikecamatan_id").val() != '') {
-                        //         document.getElementById("pac-input").value = jQuery("#lokasikecamatan_id option:selected").text() + ', Lebak Regency, Banten, Banten, Indonesia';
-                        //         var geocoder = new google.maps.Geocoder();
-                        //         geocoder.geocode(
-                        //             {'address': jQuery("#pac-input").val()}, 
-                        //             function(results, status) { 
-                        //                 if (status == google.maps.GeocoderStatus.OK) { 
-                        //                     var bounds = new google.maps.LatLngBounds();
-                        //                     bounds.extend(results[0].geometry.location);
-                        //                     map.fitBounds(bounds);
-                        //                     map.setZoom(14);
-                        //                 } 
-                        //                 else {
-                        //                     alert("Not found: " + status); 
-                        //                 } 
-                        //             }
-                        //         );
-                        //     } else {
-                        //         map_lebak();
-                        //     }
-                        // }
-
-                        // document.getElementById("lokasikelurahan_id").addEventListener("change", map_kelurahan, false);
-                        // function map_kelurahan() {
-                        //     if(jQuery("#lokasikecamatan_id").val() != '' && jQuery("#lokasikelurahan_id").val() != '') {
-                        //         document.getElementById("pac-input").value = jQuery("#lokasikelurahan_id option:selected").text() + ',' + jQuery("#lokasikecamatan_id option:selected").text() + ', Lebak Regency, Banten, Banten, Indonesia';
-                        //         var geocoder = new google.maps.Geocoder();
-                        //         geocoder.geocode(
-                        //             {'address': jQuery("#pac-input").val()}, 
-                        //             function(results, status) { 
-                        //                 if (status == google.maps.GeocoderStatus.OK) { 
-                        //                     var bounds = new google.maps.LatLngBounds();
-                        //                     bounds.extend(results[0].geometry.location);
-                        //                     map.fitBounds(bounds);
-                        //                     map.setZoom(14);
-                        //                 } 
-                        //                 else {
-                        //                     alert("Not found: " + status); 
-                        //                 } 
-                        //             }
-                        //         );
-                        //     } else {
-                        //         map_lebak();
-                        //     }
-                        // }
-                    // }
                     </script>
                     <input id="pac-input-{{$key}}" class="google-maps-controls google-maps-pac-input" type="text" placeholder="Search Box">
+                @elseif (isset($item['map_type']) && $item['map_type'] == 'maptiler')
+                    <script type="text/javascript">
+                    $(document).ready(function () {
+                        var maptilerApiKey = '{{ config("services.maptiler.api_key") }}';
+                        var kablebak = [-6.360093328432204, 106.24607078004048];
+
+                        var mtMap = L.map('map-{{ $key }}').setView(kablebak, 12);
+
+                        // MapTiler Satellite tile via standard Leaflet tileLayer (no SDK needed)
+                        L.tileLayer(
+                            'https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=' + maptilerApiKey,
+                            {
+                                attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                                maxZoom: 20,
+                                tileSize: 512,
+                                zoomOffset: -1,
+                            }
+                        ).addTo(mtMap);
+
+                        // GeoJSON boundary layer
+                        fetchGeojsonCached('{{ asset("assets/geojson/P3KE_LEBAK.geojson.json") }}')
+                            .then(function(data) {
+                                L.geoJSON(data, {
+                                    style: { color: '#0066cc', weight: 2, fillColor: '#0080ff', fillOpacity: 0.1 },
+                                    onEachFeature: function(feature, layer) {
+                                        if (feature.properties && feature.properties.name) {
+                                            layer.bindTooltip('<b>Kecamatan:</b> ' + feature.properties.name);
+                                        }
+                                    }
+                                }).addTo(mtMap);
+                            })
+                            .catch(function(error) { console.error('Error loading GeoJSON:', error); });
+
+                        var currentMarker = null;
+
+                        // Restore existing marker if editing
+                        @if (isset($item['value']) && $item['value'] != '')
+                        try {
+                            var existingVal = $('#{{$key}}').val();
+                            if (existingVal && existingVal !== '' && existingVal !== 'null') {
+                                var existingMarkerData = JSON.parse(existingVal);
+                                if (existingMarkerData.lat !== undefined && existingMarkerData.lng !== undefined) {
+                                    currentMarker = L.marker([existingMarkerData.lat, existingMarkerData.lng], { draggable: true }).addTo(mtMap);
+                                    currentMarker.on('dragend', function() {
+                                        var pos = currentMarker.getLatLng();
+                                        $('#{{$key}}').val(JSON.stringify({lat: pos.lat, lng: pos.lng}));
+                                    });
+                                    mtMap.setView([existingMarkerData.lat, existingMarkerData.lng], 14);
+                                }
+                            }
+                        } catch(e) { console.warn('Could not parse existing marker:', e); }
+                        @endif
+
+                        // Click to place marker
+                        mtMap.on('click', function(e) {
+                            if (currentMarker) mtMap.removeLayer(currentMarker);
+                            currentMarker = L.marker([e.latlng.lat, e.latlng.lng], { draggable: true }).addTo(mtMap);
+                            $('#{{$key}}').val(JSON.stringify({lat: e.latlng.lat, lng: e.latlng.lng}));
+                            currentMarker.on('dragend', function() {
+                                var pos = currentMarker.getLatLng();
+                                $('#{{$key}}').val(JSON.stringify({lat: pos.lat, lng: pos.lng}));
+                            });
+                        });
+
+                        // Geocoding via MapTiler API
+                        function maptilerGeocode(query) {
+                            fetch('https://api.maptiler.com/geocoding/' + encodeURIComponent(query) + '.json?key=' + maptilerApiKey + '&country=id&limit=1')
+                                .then(function(r) { return r.json(); })
+                                .then(function(data) {
+                                    if (data.features && data.features.length > 0) {
+                                        var c = data.features[0].center;
+                                        mtMap.setView([c[1], c[0]], 14);
+                                    }
+                                })
+                                .catch(function(e) { console.error('Geocoding error:', e); });
+                        }
+
+                        function maptilerAddMarker(lat, lng) {
+                            if (currentMarker) mtMap.removeLayer(currentMarker);
+                            currentMarker = L.marker([lat, lng], { draggable: true }).addTo(mtMap);
+                            $('#{{$key}}').val(JSON.stringify({lat: lat, lng: lng}));
+                            currentMarker.on('dragend', function() {
+                                var pos = currentMarker.getLatLng();
+                                $('#{{$key}}').val(JSON.stringify({lat: pos.lat, lng: pos.lng}));
+                            });
+                            mtMap.setView([lat, lng], 14);
+                        }
+
+                        // Backward-compatible globals
+                        window.mainLocation = function() { return "Lebak Regency, Banten, Banten, Indonesia"; };
+                        window.googleMapSearch = function(key, location, marker) {
+                            maptilerGeocode(location + ', ' + window.mainLocation());
+                            if (marker !== undefined && marker !== 'undefined') {
+                                try { var m = JSON.parse(marker); maptilerAddMarker(m.lat, m.lng); }
+                                catch(e) { console.warn('Could not parse marker:', e); }
+                            }
+                        };
+                        window.googleMapAddMarker = function(lat, lng) { maptilerAddMarker(lat, lng); };
+
+                        // Search input
+                        var searchInput = document.getElementById('pac-input-{{$key}}');
+                        if (searchInput) {
+                            var searchTimeout = null;
+                            searchInput.addEventListener('keyup', function() {
+                                clearTimeout(searchTimeout);
+                                if (searchInput.value.length > 2) {
+                                    searchTimeout = setTimeout(function() { maptilerGeocode(searchInput.value); }, 500);
+                                }
+                            });
+                            searchInput.addEventListener('keydown', function(e) {
+                                if (e.key === 'Enter') { e.preventDefault(); maptilerGeocode(searchInput.value); }
+                            });
+                        }
+                    });
+                    </script>
+                    <div style="margin-bottom: 10px;">
+                        <input id="pac-input-{{$key}}" class="form-control" type="text" placeholder="🔍 Cari lokasi...">
+                    </div>
                 @else
                     <script type="text/javascript">
                     $(document).ready(function () {
                         var map = L.map('map-{{ $key }}').setView([-6.5783, 106.1207], 10); // Set view to Lebak District
 
                         // Example GeoJSON data with a polygon feature
-                        fetch('{{ asset("assets/geojson/P3KE_LEBAK.geojson.json") }}')
-                            .then(response => response.json())
+                        fetchGeojsonCached('{{ asset("assets/geojson/P3KE_LEBAK.geojson.json") }}')
                             .then(data => {
                                 // Adding GeoJSON layer to the map
                                 L.geoJSON(data, {
@@ -567,7 +562,7 @@ $(document).ready(function(){
                     });
                     </script>
                 @endif
-                <div id="map-{{$key}}"></div>
+                <div id="map-{{$key}}" class="map-leaf"></div>
 
                 @break
             @case('data-multi')

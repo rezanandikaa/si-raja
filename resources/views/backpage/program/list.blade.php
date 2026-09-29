@@ -1,21 +1,25 @@
 @php
 $datatable = [];
 
+// Urutan di sini harus sama dengan urutan <th> di bawah.
 $datatable['json_data'] = [
-    ['data' => "budget_year_name", 'name' => "mt_budget_year.name"],
-    ['data' => "code", 'name' => "tr_program.code"],
-    ['data' => "status", 'name' => "tr_program.status"],
-    ['data' => "district_name", 'name' => "district.name"],
-    ['data' => "subdistrict_name", 'name' => "subdistrict.name"],
+    ['data' => "DT_RowIndex", 'name' => "DT_RowIndex", 'orderable' => false, 'searchable' => false],
     ['data' => "strategy_program_name", 'name' => "program_goal.value"],
-    // ['data' => "organization_name", 'name' => "mt_organization.name"],
     ['data' => "created_by_organization_name", 'name' => "created_by_org.name"],
+    ['data' => "code", 'name' => "tr_program.code"],
     ['data' => "program", 'name' => "tr_program.program"],
     ['data' => "activity", 'name' => "tr_program.activity"],
     ['data' => "sub_activity", 'name' => "tr_program.sub_activity"],
+    // Header "Aktivitas Real" merge 3 kolom ini. Isinya dari form Program (teks bebas).
+    ['data' => "aktivitas_real_langsung", 'name' => "aktivitas_real_langsung", 'orderable' => false, 'searchable' => false],
+    ['data' => "aktivitas_real_tidak_langsung", 'name' => "aktivitas_real_tidak_langsung", 'orderable' => false, 'searchable' => false],
+    ['data' => "aktivitas_real_penunjang", 'name' => "aktivitas_real_penunjang", 'orderable' => false, 'searchable' => false],
+    ['data' => "status", 'name' => "tr_program.status"],
+    ['data' => "district_name", 'name' => "district.name"],
+    ['data' => "subdistrict_name", 'name' => "subdistrict.name"],
+    ['data' => "lokasi_tambahan", 'name' => "tr_program.lokasi_tambahan"],
+    // ['data' => "organization_name", 'name' => "mt_organization.name"],
     ['data' => "budget_allocation", 'name' => "tr_program.budget_allocation"],
-    ['data' => "budget_realization", 'name' => "tr_program.budget_realization"],
-    ['data' => "percentage", 'name' => "percentage"],
     ['data' => "description", 'name' => "tr_program.description"],
     ['data' => "updated_by_name", 'name' => "updated_by.name"],
     ['data' => "updated_at", 'name' => "tr_program.updated_at"],
@@ -33,7 +37,6 @@ $datatable['route_insert'] = route('program.insert');
 <link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/dataTables.bootstrap4.min.css') }}">
 <link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/fixedeader/dataTables.fixedcolumns.bootstrap4.min.css') }}">
 <link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/fixedeader/dataTables.fixedheader.bootstrap4.min.css') }}">
-<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
 @endsection
 
 @section('vendor-js')
@@ -43,14 +46,13 @@ $datatable['route_insert'] = route('program.insert');
 <script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.colVis.min.js') }}"></script>
 <script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.html5.min.js') }}"></script>
 <script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.print.min.js') }}"></script>
-<script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
 
 <script type="text/javascript">
 $(document).ready(function(){
     'use strict'
 
     var table = $('.js-basic-datatable').DataTable({
-        responsive: true,
+        scrollX: true,
         processing: true,
         serverSide: true,
         language: {
@@ -145,7 +147,8 @@ $(document).ready(function(){
                 targets: '_all'
             }
         ],
-        order: [[ 0, "asc" ]]
+        // Index 3 = kolom Kode (tr_program.code). Index 0 "Nomor" tidak bisa diurutkan.
+        order: [[ 3, "asc" ]]
     });
 
     $('.js-basic-datatable tbody').on('click', 'a.delete', function () {
@@ -370,25 +373,31 @@ $(document).ready(function () {
                         <div class="table-responsive">
                             <table class="table table-hover table-custom dataTable js-basic-datatable" width="100%">
                                 <thead>
+                                    {{-- Baris pertama: kolom biasa pakai rowspan="2", "Aktivitas Real" menaungi 3 kolom di bawahnya. --}}
                                     <tr>
-                                        <th>Tahun Anggaran</th>
-                                        <th>Nomenklatur</th>
-                                        <th>Status</th>
-                                        <th>Kecamatan</th>
-                                        <th>Desa/Kelurahan</th>
-                                        <th>Strategi</th>
-                                        <th>Organisasi</th>
-                                        <th>Program</th>
-                                        <th>Kegiatan</th>
-                                        <th>Sub Kegiatan</th>
-                                        {{-- <th>Sumber Pembiayaan</th> --}}
-                                        <th>Pagu</th>
-                                        <th>Realisasi</th>
-                                        <th>Persentase</th>
-                                        <th>Catatan</th>
-                                        <th>Diubah oleh</th>
-                                        <th>Diubah pada</th>
-                                        <th>Opsi</th>
+                                        <th rowspan="2">Nomor</th>
+                                        <th rowspan="2">Strategi OPPKPKE</th>
+                                        <th rowspan="2">Perangkat Daerah</th>
+                                        <th rowspan="2">Kode</th>
+                                        <th rowspan="2">Program</th>
+                                        <th rowspan="2">Kegiatan</th>
+                                        <th rowspan="2">Sub Kegiatan</th>
+                                        <th colspan="3" class="text-center">Aktivitas Real</th>
+                                        <th rowspan="2">Status</th>
+                                        <th rowspan="2">Kecamatan</th>
+                                        <th rowspan="2">Desa/Kelurahan</th>
+                                        <th rowspan="2">Lokasi Tambahan</th>
+                                        {{-- <th rowspan="2">Sumber Pembiayaan</th> --}}
+                                        <th rowspan="2" class="text-center">Pagu</th>
+                                        <th rowspan="2">Catatan</th>
+                                        <th rowspan="2">Diubah oleh</th>
+                                        <th rowspan="2">Diubah pada</th>
+                                        <th rowspan="2">Opsi</th>
+                                    </tr>
+                                    <tr>
+                                        <th>Langsung</th>
+                                        <th>Tidak Langsung</th>
+                                        <th>Penunjang</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>

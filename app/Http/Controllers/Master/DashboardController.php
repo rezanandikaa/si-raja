@@ -157,49 +157,52 @@ class DashboardController extends Controller
             case 'BAR':
             case 'COLUMN':
                 $fields['key'] = [
-                    'label' => 'Label Data',
+                    'label' => 'Kelompokkan Berdasarkan',
                     'name' => 'key',
-                    'placeholder' => 'Label Data',
+                    'placeholder' => 'Kelompokkan Berdasarkan',
                     'type' => 'data',
                     'data_table' => 'custom_options',
                     'data_condition' => '',
                     'data_extra' => '',
                     'required' => true,
                     'show_only' => false,
-                    'validate_message' => 'Label Data wajib diisi'
+                    'validate_message' => 'Kelompokkan Berdasarkan wajib diisi'
                 ];
                 $fields['column'] = [
-                    'label' => 'Nama Kolom',
+                    'label' => 'Kolom Kelompok (kolom penyimpan id pilihan di atas)',
                     'name' => 'column',
-                    'placeholder' => 'Nama Kolom',
+                    'placeholder' => 'Kolom Kelompok',
                     'type' => 'select',
                     'options' => $columns,
                     'required' => true,
                     'show_only' => false,
-                    'validate_message' => 'Nama Kolom wajib diisi'
+                    'validate_message' => 'Kolom Kelompok wajib diisi'
                 ];
                 $fields['type'] = [
-                    'label' => 'Jenis',
+                    'label' => 'Jenis Perhitungan',
                     'name' => 'type',
-                    'placeholder' => 'Jenis',
+                    'placeholder' => 'Jenis Perhitungan',
                     'type' => 'select',
-                    'options' => ['SUM','COUNT'],
+                    'options' => [
+                        ['value' => 'COUNT', 'label' => 'Hitung Jumlah Data (COUNT)'],
+                        ['value' => 'SUM', 'label' => 'Jumlahkan Nilai Kolom (SUM)'],
+                    ],
                     'required' => true,
                     'show_only' => false,
-                    'validate_message' => 'Nilai wajib diisi'
+                    'validate_message' => 'Jenis Perhitungan wajib diisi'
                 ];
                 $fields['value'] = [
-                    'label' => 'Nilai',
+                    'label' => 'Kolom yang Dijumlahkan (dipakai saat SUM)',
                     'name' => 'value',
-                    'placeholder' => 'Nilai',
+                    'placeholder' => 'Kolom yang Dijumlahkan',
                     'type' => 'select',
                     'options' => $columns,
-                    'required' => true,
+                    'required' => false,
                     'show_only' => false,
-                    'validate_message' => 'Nilai wajib diisi'
+                    'validate_message' => 'Kolom yang Dijumlahkan wajib diisi'
                 ];
                 $fields['district_id'] = [
-                    'label' => 'Kecamatan',
+                    'label' => 'Kecamatan (opsional, kosong = semua)',
                     'name' => 'district_id',
                     'placeholder' => 'Kecamatan',
                     'type' => 'data',
@@ -211,7 +214,7 @@ class DashboardController extends Controller
                     'validate_message' => 'Kecamatan wajib diisi'
                 ];
                 $fields['subdistrict_id'] = [
-                    'label' => 'Desa/Kelurahan',
+                    'label' => 'Desa/Kelurahan (opsional, kosong = semua)',
                     'name' => 'subdistrict_id',
                     'placeholder' => 'Desa/Kelurahan',
                     'type' => 'data',
@@ -224,13 +227,13 @@ class DashboardController extends Controller
                 ];
                 if (in_array($record['type'], ['BAR', 'COLUMN'])){
                     $fields['interval'] = [
-                        'label' => 'Jarak Antar Data',
+                        'label' => 'Interval Garis Sumbu Y',
                         'name' => 'interval',
-                        'placeholder' => 'Jarak Antar Data',
+                        'placeholder' => 'Interval Sumbu Y',
                         'type' => 'number',
                         'required' => true,
                         'show_only' => false,
-                        'validate_message' => 'Jarak Antar Data wajib diisi'
+                        'validate_message' => 'Interval Garis Sumbu Y wajib diisi'
                     ];
                 }
                 break;
@@ -240,56 +243,61 @@ class DashboardController extends Controller
                     'name' => 'name',
                     'placeholder' => 'Grafik',
                     'type' => 'select',
-                    'options' => ['PROGRAM-VS-REALIZATION'],
+                    'options' => [
+                        ['value' => 'PROGRAM-VS-REALIZATION', 'label' => 'Rencana vs Realisasi Kegiatan'],
+                    ],
                     'data_extra' => '',
                     'required' => true,
                     'show_only' => false,
                     'validate_message' => 'Grafik wajib diisi'
                 ];
                 $fields['key'] = [
-                    'label' => 'Label Data',
+                    'label' => 'Kelompokkan Berdasarkan',
                     'name' => 'key',
-                    'placeholder' => 'Label Data',
+                    'placeholder' => 'Kelompokkan Berdasarkan',
                     'type' => 'data',
                     'data_table' => 'custom_options',
                     'data_condition' => '',
                     'data_extra' => '',
                     'required' => true,
                     'show_only' => false,
-                    'validate_message' => 'Label Data wajib diisi'
+                    'validate_message' => 'Kelompokkan Berdasarkan wajib diisi'
                 ];
                 $fields['column'] = [
-                    'label' => 'Nama Kolom',
+                    'label' => 'Kolom Kelompok (kolom penyimpan id pilihan di atas)',
                     'name' => 'column',
-                    'placeholder' => 'Nama Kolom',
+                    'placeholder' => 'Kolom Kelompok',
                     'type' => 'select',
                     'options' => $columns,
                     'required' => true,
                     'show_only' => false,
-                    'validate_message' => 'Nama Kolom wajib diisi'
+                    'validate_message' => 'Kolom Kelompok wajib diisi'
                 ];
                 $fields['type'] = [
-                    'label' => 'Jenis',
+                    'label' => 'Jenis Perhitungan',
                     'name' => 'type',
-                    'placeholder' => 'Jenis',
+                    'placeholder' => 'Jenis Perhitungan',
                     'type' => 'select',
-                    'options' => ['SUM','COUNT'],
+                    'options' => [
+                        ['value' => 'COUNT', 'label' => 'Hitung Jumlah Data (COUNT)'],
+                        ['value' => 'SUM', 'label' => 'Jumlahkan Nilai Kolom (SUM)'],
+                    ],
                     'required' => true,
                     'show_only' => false,
-                    'validate_message' => 'Nilai wajib diisi'
+                    'validate_message' => 'Jenis Perhitungan wajib diisi'
                 ];
                 $fields['value'] = [
-                    'label' => 'Nilai',
+                    'label' => 'Kolom yang Dijumlahkan (dipakai saat SUM)',
                     'name' => 'value',
-                    'placeholder' => 'Nilai',
+                    'placeholder' => 'Kolom yang Dijumlahkan',
                     'type' => 'select',
                     'options' => $columns,
-                    'required' => true,
+                    'required' => false,
                     'show_only' => false,
-                    'validate_message' => 'Nilai wajib diisi'
+                    'validate_message' => 'Kolom yang Dijumlahkan wajib diisi'
                 ];
                 $fields['district_id'] = [
-                    'label' => 'Kecamatan',
+                    'label' => 'Kecamatan (opsional, kosong = semua)',
                     'name' => 'district_id',
                     'placeholder' => 'Kecamatan',
                     'type' => 'data',
@@ -301,7 +309,7 @@ class DashboardController extends Controller
                     'validate_message' => 'Kecamatan wajib diisi'
                 ];
                 $fields['subdistrict_id'] = [
-                    'label' => 'Desa/Kelurahan',
+                    'label' => 'Desa/Kelurahan (opsional, kosong = semua)',
                     'name' => 'subdistrict_id',
                     'placeholder' => 'Desa/Kelurahan',
                     'type' => 'data',
@@ -313,57 +321,60 @@ class DashboardController extends Controller
                     'validate_message' => 'Desa/Kelurahan wajib diisi'
                 ];
                 $fields['interval'] = [
-                    'label' => 'Jarak Antar Data',
+                    'label' => 'Interval Garis Sumbu Y',
                     'name' => 'interval',
-                    'placeholder' => 'Jarak Antar Data',
+                    'placeholder' => 'Interval Sumbu Y',
                     'type' => 'number',
                     'required' => true,
                     'show_only' => false,
-                    'validate_message' => 'Jarak Antar Data wajib diisi'
+                    'validate_message' => 'Interval Garis Sumbu Y wajib diisi'
                 ];
                 break;
             case 'MAP':
                 $fields['region'] = [
-                    'label' => 'Wilayah',
+                    'label' => 'Wilayah Peta',
                     'name' => 'region',
-                    'placeholder' => 'Wilayah',
+                    'placeholder' => 'Wilayah Peta',
                     'type' => 'select',
-                    'options' => ['3-KECAMATAN', '4-DESA-KELURAHAN'],
+                    'options' => [
+                        ['value' => '3-KECAMATAN', 'label' => 'Kecamatan'],
+                        ['value' => '4-DESA-KELURAHAN', 'label' => 'Desa/Kelurahan'],
+                    ],
                     'required' => true,
                     'show_only' => false,
-                    'validate_message' => 'Wilayah wajib diisi'
+                    'validate_message' => 'Wilayah Peta wajib diisi'
                 ];
                 $fields['column'] = [
-                    'label' => 'Nama Kolom',
+                    'label' => 'Filter Kolom (opsional, kosong = tanpa filter)',
                     'name' => 'column',
-                    'placeholder' => 'Nama Kolom',
+                    'placeholder' => 'Filter Kolom',
                     'type' => 'select',
                     'options' => $columns,
                     'required' => false,
                     'show_only' => false,
-                    'validate_message' => 'Nama Kolom wajib diisi'
+                    'validate_message' => 'Filter Kolom wajib diisi'
                 ];
                 $fields['value'] = [
-                    'label' => 'Nilai',
+                    'label' => 'Nilai Filter (opsional, ikut Filter Kolom)',
                     'name' => 'value',
-                    'placeholder' => 'Nilai',
+                    'placeholder' => 'Nilai Filter',
                     'type' => 'data',
                     'data_table' => 'sy_option',
                     'data_condition' => '',
                     'data_extra' => '',
                     'required' => false,
                     'show_only' => false,
-                    'validate_message' => 'Nilai wajib diisi'
+                    'validate_message' => 'Nilai Filter wajib diisi'
                 ];
                 if(in_array($record['source'], ['PROGRAM', 'REALISASI'])) {
                     $fields['is_mappoint'] = [
-                        'label' => 'Marker Point Map',
+                        'label' => 'Tampilkan Marker Titik Peta',
                         'name' => 'is_mappoint',
-                        'placeholder' => 'Marker Point Map',
+                        'placeholder' => 'Tampilkan Marker Titik Peta',
                         'type' => 'checkbox',
                         'required' => false,
                         'show_only' => false,
-                        'validate_message' => 'Marker Point Map wajib diisi'
+                        'validate_message' => 'Tampilkan Marker Titik Peta wajib diisi'
                     ];
                 }
                 break;

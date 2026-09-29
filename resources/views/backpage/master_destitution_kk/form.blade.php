@@ -3,11 +3,14 @@
 @section('vendor-css')
 <link rel="stylesheet" href="{{ asset('assets/vendor/bootstrap-multiselect/bootstrap-multiselect.css') }}">
 <link rel="stylesheet" href="{{ asset('assets/vendor/parsleyjs/css/parsley.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/vendor/bootstrap-datepicker/bootstrap-datepicker3.css') }}">
 @endsection
 
 @section('vendor-js')
 <script src="{{ asset('assets/vendor/bootstrap-multiselect/bootstrap-multiselect.js') }}"></script>
 <script src="{{ asset('assets/vendor/parsleyjs/js/parsley.min.js') }}"></script>
+<script src="{{ asset('assets/vendor/bootstrap-datepicker/bootstrap-datepicker.min.js') }}"></script>
+<script src="{{ asset('assets/vendor/bootstrap-datepicker/locales/bootstrap-datepicker.id.min.js') }}"></script>
 @include('baduyengine.component-js.form')
 <script>
 $(document).ready(function(){
@@ -20,36 +23,83 @@ $(document).ready(function(){
         console.log('textBlur', id);
     }
 
-    // $('.be-select-data').on('mousedown', function() {
-    //     var select = $(this);
-    //     var dataTable = select.attr('data-table');
-    //     var dataCondition = select.attr('data-condition');
-    //     $.ajax({
-    //         headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')},
-    //         url: '{{ route("ajax.data_select") }}',
-    //         method: 'POST',
-    //         dataType: 'json',
-    //         data: {table: dataTable, condition: dataCondition},
-    //         success: function(data) {
-    //             // Data telah berhasil diambil
-    //             select.empty();
+    // Kecamatan ikut Kabupaten/Kota terpilih. Opsi wilayah dari mt_region berlabel
+    // "<kode>-<nama>" (lihat CompileRepository::getOptions), jadi kode Kabupaten/Kota
+    // cukup dibaca dari teks opsi lalu dicocokkan sebagai awalan kode Kecamatan.
+    // Daftar kecamatan sudah dirender semua di halaman, jadi filter di sisi klien saja.
+    var districtOptions = null;
 
-    //             select.append($('<option></option>')
-    //                 .attr('value', "")
-    //                 .text("-- Pilih --")
-    //             );
-    //             $.each(data, function(key, value) {
-    //                 select.append($('<option></option>')
-    //                     .attr('value', value.id)
-    //                     .text(value.label)
-    //                 );
-    //             });
-    //         },
-    //         error: function() {
-    //             console.log('Terjadi kesalahan dalam permintaan AJAX');
-    //         }
-    //     });
-    // });
+    function filterDistrict() {
+        var $district = $('#district_id');
+
+        if (districtOptions === null) {
+            districtOptions = $district.find('option').clone();
+        }
+
+        var regencyCode = ($('#regency_id').find('option:selected').text().match(/^\d+/) || [''])[0];
+
+        $district.empty();
+        districtOptions.each(function() {
+            var code = ($(this).text().match(/^\d+/) || [''])[0];
+            if (this.value === '' || !regencyCode || code.indexOf(regencyCode) === 0) {
+                $district.append($(this).clone());
+            }
+        });
+
+        // Pilihan lama dibuang karena belum tentu ada di kabupaten yang baru.
+        $district.val('').multiselect('rebuild');
+        // Kecamatan sudah kosong, desa dari kecamatan lama tidak boleh ikut tersimpan.
+        $('#subdistrict_id').val('').multiselect('rebuild');
+    }
+
+    // Desa/Kelurahan ikut Kecamatan terpilih, meniru form Program: daftar diambil
+    // ulang lewat ajax.data_select memakai mt_region.parent_id (id kecamatan),
+    // bukan mencocokkan kode.
+    $('#district_id').on('change', function() {
+        var district_id = $(this).val();
+
+        $.ajax({
+            headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')},
+            url: '{{ route("ajax.data_select") }}',
+            method: 'POST',
+            dataType: 'json',
+            data: {table: 'mt_region', condition: ' and mt_region.parent_id = "'+district_id+'"'},
+            success: function(data) {
+                var select = $("#subdistrict_id");
+                // Ganti daftar opsi: kosongkan, lepas plugin, isi ulang, pasang plugin lagi.
+                select.empty();
+                select.multiselect('destroy');
+
+                select.append($('<option></option>')
+                    .attr('value', "")
+                    .text("-- Pilih --")
+                );
+                $.each(data, function(key, value) {
+                    select.append($('<option></option>')
+                        .attr('value', value.id)
+                        .text(value.label)
+                    );
+                });
+
+                select.multiselect({
+                    enableFiltering: true,
+                    enableCaseInsensitiveFiltering: true,
+                    maxHeight: 400,
+                });
+            },
+            error: function() {
+                console.log('Terjadi kesalahan dalam permintaan AJAX');
+            }
+        });
+    });
+
+    $('#regency_id').on('change', filterDistrict);
+
+    // Saat edit, daftar kecamatan langsung dipangkas sesuai kabupaten tersimpan.
+    // Saat insert belum ada kabupaten, jadi daftar dibiarkan utuh.
+    if ($('#regency_id').val()) {
+        filterDistrict();
+    }
 });
 </script>
 @endsection

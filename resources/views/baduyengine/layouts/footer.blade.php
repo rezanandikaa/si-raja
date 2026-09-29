@@ -12,7 +12,6 @@
 <script src="{{ asset('assets/vendor/cropperjs/dist/cropper.min.js') }}"></script>
 <!-- Include Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-
 @yield('vendor-js')
 
 <!-- page js file -->

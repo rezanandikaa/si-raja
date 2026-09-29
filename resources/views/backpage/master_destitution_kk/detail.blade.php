@@ -207,8 +207,8 @@ $datatable['route_data'] = route('master.destitution_kk.bnba.get_data', ['id' =>
                                             <div class="body">
                                                 <div class="icon text-info"><i class="fa-solid fa-plug-circle-bolt"></i></div>
                                                 <div class="content">
-                                                    <div class="text text-dots"><small>{{ get_option($data['datas']['home_electricity_id']) }}</small></div>
-                                                    <h6 class="text">{{ get_option($data['datas']['home_electricity_power_id']) }}</h6>
+                                                    <div class="text text-dots"><small>LISTRIK PLN METERAN</small></div>
+                                                    <h6 class="text">{{ get_option($data['datas']['home_electricity_power_id']) }} KWH</h6>
                                                 </div>
                                             </div>
                                         </div>

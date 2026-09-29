@@ -246,7 +246,7 @@ class AjaxController extends Controller
                                 $programs = $this->program_repo->getRecords($condition);
                                 foreach ($programs as $program) {
                                     $latlng = str_replace("lng", "lon", $program->marker);
-                                    $geotagging = json_decode($latlng, true);
+                                    $geotagging = json_decode($latlng, true) ?? [];
                                     $geotagging = array_merge(['name' => $program->sub_activity, 'activity' => $program->activity, 'code' => $program->code, 'program' => $program->program, 'budget_allocation' => number_format($program->budget_allocation, 0)], $geotagging);
                                     array_push($datas['mappoint'], $geotagging);
                                 }
@@ -281,7 +281,7 @@ class AjaxController extends Controller
                                 $programs = $this->program_realization_repo->getRecordsGroupBy($condition);
                                 foreach ($programs as $program) {
                                     $latlng = str_replace("lng", "lon", $program->program_marker);
-                                    $geotagging = json_decode($latlng, true);
+                                    $geotagging = json_decode($latlng, true) ?? [];
                                     $geotagging = array_merge(['name' => $program->program_sub_activity, 'activity' => $program->program_activity, 'code' => $program->program_code, 'program' => $program->program_program, 'budget_allocation' => number_format($program->program_budget_allocation, 0)], $geotagging);
                                     array_push($datas['mappoint'], $geotagging);
                                 }
@@ -573,7 +573,7 @@ class AjaxController extends Controller
                             $realizations = $this->program_realization_repo->getRecordsGroupBy($cond);
                             foreach ($realizations as $realization) {
                                 $latlng = str_replace("lng", "lon", $realization->program_marker);
-                                $geotagging = json_decode($latlng, true);
+                                $geotagging = json_decode($latlng, true) ?? [];
                                 $geotagging = array_merge(['name' => $realization->program_sub_activity, 'activity' => $realization->program_activity, 'code' => $realization->program_code, 'program' => $realization->program_program, 'budget_allocation' => number_format($realization->program_budget_allocation, 0), 'sum_budget_realization' => number_format($realization->sum_budget_realization, 0)], $geotagging);
                                 array_push($datas['mappoint'], $geotagging);
                             }
@@ -585,7 +585,7 @@ class AjaxController extends Controller
                             $programs = $this->program_repo->getRecords($cond);
                             foreach ($programs as $program) {
                                 $latlng = str_replace("lng", "lon", $program->marker);
-                                $geotagging = json_decode($latlng, true);
+                                $geotagging = json_decode($latlng, true) ?? [];
                                 $geotagging = array_merge(['name' => $program->sub_activity, 'activity' => $program->activity, 'code' => $program->code, 'program' => $program->program, 'budget_allocation' => number_format($program->budget_allocation, 0)], $geotagging);
                                 array_push($datas['mappoint'], $geotagging);
                             }
@@ -600,7 +600,7 @@ class AjaxController extends Controller
                             $realizations = $this->program_realization_repo->getRecordsGroupBy($cond);
                             foreach ($realizations as $realization) {
                                 $latlng = str_replace("lng", "lon", $realization->program_marker);
-                                $geotagging = json_decode($latlng, true);
+                                $geotagging = json_decode($latlng, true) ?? [];
                                 $geotagging = array_merge(['name' => $realization->program_sub_activity], $geotagging);
                                 array_push($datas['mappoint'], $geotagging);
                             }
@@ -612,7 +612,7 @@ class AjaxController extends Controller
                             $programs = $this->program_repo->getRecords($cond);
                             foreach ($programs as $program) {
                                 $latlng = str_replace("lng", "lon", $program->marker);
-                                $geotagging = json_decode($latlng, true);
+                                $geotagging = json_decode($latlng, true) ?? [];
                                 $geotagging = array_merge(['name' => $program->sub_activity], $geotagging);
                                 array_push($datas['mappoint'], $geotagging);
                             }
@@ -636,7 +636,7 @@ class AjaxController extends Controller
                     $programs = $this->program_repo->getRecords($cond);
                     foreach ($programs as $program) {
                         $latlng = str_replace("lng", "lon", $program->marker);
-                        $geotagging = json_decode($latlng, true);
+                        $geotagging = json_decode($latlng, true) ?? [];
                         $geotagging = array_merge(['name' => $program->sub_activity, 'activity' => $program->activity, 'code' => $program->code, 'program' => $program->program, 'budget_allocation' => number_format($program->budget_allocation, 0)], $geotagging);
                         array_push($datas['mappoint'], $geotagging);
                     }
@@ -647,7 +647,7 @@ class AjaxController extends Controller
                     $programs = $this->program_repo->getRecords($cond);
                     foreach ($programs as $program) {
                         $latlng = str_replace("lng", "lon", $program->marker);
-                        $geotagging = json_decode($latlng, true);
+                        $geotagging = json_decode($latlng, true) ?? [];
                         $geotagging = array_merge(['name' => $program->sub_activity], $geotagging);
                         array_push($datas['mappoint'], $geotagging);
                     }
@@ -669,7 +669,7 @@ class AjaxController extends Controller
                     $programs = $this->program_repo->getRecords($cond);
                     foreach ($programs as $program) {
                         $latlng = str_replace("lng", "lon", $program->marker);
-                        $geotagging = json_decode($latlng, true);
+                        $geotagging = json_decode($latlng, true) ?? [];
                         $geotagging = array_merge(['name' => $program->sub_activity, 'activity' => $program->activity, 'code' => $program->code, 'program' => $program->program, 'budget_allocation' => number_format($program->budget_allocation, 0)], $geotagging);
                         array_push($datas['mappoint'], $geotagging);
                     }
@@ -680,7 +680,7 @@ class AjaxController extends Controller
                     $programs = $this->program_repo->getRecords($cond);
                     foreach ($programs as $program) {
                         $latlng = str_replace("lng", "lon", $program->marker);
-                        $geotagging = json_decode($latlng, true);
+                        $geotagging = json_decode($latlng, true) ?? [];
                         $geotagging = array_merge(['name' => $program->sub_activity], $geotagging);
                         array_push($datas['mappoint'], $geotagging);
                     }
@@ -702,7 +702,7 @@ class AjaxController extends Controller
                     $programs = $this->program_repo->getRecords($cond);
                     foreach ($programs as $program) {
                         $latlng = str_replace("lng", "lon", $program->marker);
-                        $geotagging = json_decode($latlng, true);
+                        $geotagging = json_decode($latlng, true) ?? [];
                         $geotagging = array_merge(['name' => $program->sub_activity, 'activity' => $program->activity, 'code' => $program->code, 'program' => $program->program, 'budget_allocation' => number_format($program->budget_allocation, 0)], $geotagging);
                         array_push($datas['mappoint'], $geotagging);
                     }
@@ -713,7 +713,7 @@ class AjaxController extends Controller
                     $programs = $this->program_repo->getRecords($cond);
                     foreach ($programs as $program) {
                         $latlng = str_replace("lng", "lon", $program->marker);
-                        $geotagging = json_decode($latlng, true);
+                        $geotagging = json_decode($latlng, true) ?? [];
                         $geotagging = array_merge(['name' => $program->sub_activity], $geotagging);
                         array_push($datas['mappoint'], $geotagging);
                     }

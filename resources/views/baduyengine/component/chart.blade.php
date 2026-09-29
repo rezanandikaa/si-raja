@@ -1,69 +1,20 @@
 @if ($chart['status'])
-@switch($chart['type'])
-    @case('PIE')
-        <div class="col-lg-6 col-md-12">
-            <div class="card">
-                <div class="body">
-                    <div id="pie-{{$chart["id"]}}" style="height: 24rem">
-                        <div id="loading-screen-{{ $chart["id"] }}">
-                            <img src="{{ asset('assets/images/gif/loading.gif') }}" alt="Loading..." />
-                        </div>
-                    </div>
+@php
+    // Prefix DOM lama dipertahankan supaya CSS/JS yang sudah menunjuk ke #map-/#pie-/dst tidak berubah.
+    $chart_prefix = ['MAP' => 'map', 'PIE' => 'pie', 'BAR' => 'bar', 'COLUMN' => 'column'][$chart['type']] ?? 'custom';
+    $chart_dom_id = $chart_prefix . '-' . $chart['id'];
+    $chart_height = $chart['type'] === 'MAP' ? '48rem' : '24rem';
+@endphp
+<div class="col-lg-6 col-md-12 col-12">
+    <div class="card">
+        <div class="body">
+            <div id="{{ $chart_dom_id }}" style="height: {{ $chart_height }}">
+                <div id="loading-screen-{{ $chart['id'] }}" data-chart-target="{{ $chart_dom_id }}">
+                    <img src="{{ asset('assets/images/gif/loading.gif') }}" alt="Memuat..." />
                 </div>
             </div>
         </div>
-        @break
-    @case('BAR')
-        <div class="col-lg-6 col-md-12">
-            <div class="card">
-                <div class="body">
-                    <div id="bar-{{$chart["id"]}}" style="height: 24rem">
-                        <div id="loading-screen-{{ $chart["id"] }}">
-                            <img src="{{ asset('assets/images/gif/loading.gif') }}" alt="Loading..." />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        @break
-    @case('COLUMN')
-        <div class="col-lg-6 col-md-12">
-            <div class="card">
-                <div class="body">
-                    <div id="column-{{$chart["id"]}}" style="height: 24rem">
-                        <div id="loading-screen-{{ $chart["id"] }}">
-                            <img src="{{ asset('assets/images/gif/loading.gif') }}" alt="Loading..." />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        @break
-    @case('MAP')
-        <div class="col-lg-6 col-md-12 col-12">
-            <div class="card">
-                <div class="body">
-                    <div id="map-{{$chart["id"]}}" style="height: 48rem">
-                        <div id="loading-screen-{{ $chart["id"] }}">
-                            <img src="{{ asset('assets/images/gif/loading.gif') }}" alt="Loading..." />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        @break
-    @default
-        <div class="col-lg-6 col-md-12 col-12">
-            <div class="card">
-                <div class="body">
-                    <div id="custom-{{$chart["id"]}}" style="height: 24rem">
-                        <div id="loading-screen-{{ $chart["id"] }}">
-                            <img src="{{ asset('assets/images/gif/loading.gif') }}" alt="Loading..." />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-@endswitch
+    </div>
+</div>
 @endif
 
