@@ -24,7 +24,8 @@ class ProgramExport implements FromView, WithStyles
     protected $budget_year_id;
 
     // Nomor baris pemisah antar Strategi OPPKPE di sheet, diisi di view() lalu
-    // dipakai styles() untuk menebalkan + memberi latar barisnya.
+    // dipakai styles() untuk menebalkan + memberi latar barisnya. Baris yang sama
+    // juga memuat total alokasi anggaran strategi tersebut di kolom K.
     protected $separator_rows = [];
 
     public function __construct(int $budget_year_id)
@@ -166,16 +167,37 @@ class ProgramExport implements FromView, WithStyles
             $groups[$record['goal_value']][] = $record;
         }
 
-        // Nomor baris pemisah: header memakai baris 1-2, jadi baris pertama data = 3.
-        // Tiap pemisah menambah satu baris, jadi penghitungnya ikut maju.
+        // Total per grup strategi: alokasi anggaran + realisasi tiap triwulan dan
+        // totalnya. Dipakai baris judul strategi, dan dijumlah lagi jadi grand total
+        // untuk baris judul wilayah. Kolomnya sengaja sama persis dengan blok
+        // Anggaran (K) dan Realisasi (S..W) di sheet.
+        $total_columns = [
+            'budget_allocation',
+            'realization_q1', 'realization_q2', 'realization_q3', 'realization_q4',
+            'realization_total',
+        ];
+        $totals = [];
+        $grand_total = array_fill_keys($total_columns, 0);
+        foreach ($groups as $strategi => $records) {
+            $totals[$strategi] = array_fill_keys($total_columns, 0);
+            foreach ($total_columns as $column) {
+                $sum = array_sum(array_column($records, $column));
+                $totals[$strategi][$column] = $sum;
+                $grand_total[$column] += $sum;
+            }
+        }
+
+        // Nomor baris pemisah: header memakai baris 1-2, baris judul wilayah baris 3,
+        // jadi baris pertama data = 4. Tiap pemisah menambah satu baris,
+        // jadi penghitungnya ikut maju.
         $this->separator_rows = [];
-        $row = 3;
+        $row = 4;
         foreach ($groups as $records) {
             $this->separator_rows[] = $row;
             $row += count($records) + 1;
         }
 
-        return view('excel.program', compact('groups', 'budget_year_name'));
+        return view('excel.program', compact('groups', 'budget_year_name', 'totals', 'grand_total'));
     }
 
     public function styles(Worksheet $sheet)
@@ -201,27 +223,43 @@ class ProgramExport implements FromView, WithStyles
         // Kolom alokasi + realisasi (triwulan dan total) tampil sebagai rupiah.
         // L = Sumber Pembiayaan, M = Sifat Bantuan, N = Lokasi, O..R = teks realisasi
         // (sasaran, besaran manfaat, jenis bantuan, durasi), tidak ikut diformat.
+        // Mulai baris 3: baris judul wilayah dan baris judul strategi juga memuat
+        // grand total / total per strategi di kolom K dan blok Realisasi (S..W).
         $currency = '"Rp" #,##0';
         foreach (['K3:K', 'S3:W'] as $range) {
             $sheet->getStyle($range . $last_row)->getNumberFormat()->setFormatCode($currency);
             $sheet->getStyle($range . $last_row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         }
 
-        // Isi: rata atas + wrap agar teks panjang tidak melebar.
-        $sheet->getStyle("A3:{$last_column}{$last_row}")
+        // Isi (mulai baris 4, baris 3 dipakai judul wilayah): rata atas + wrap
+        // agar teks panjang tidak melebar.
+        $sheet->getStyle("A4:{$last_column}{$last_row}")
             ->getAlignment()->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
-        $sheet->getStyle("A3:A{$last_row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("A4:A{$last_row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // Baris pemisah Strategi OPPKPE. Dipasang setelah gaya isi di atas supaya
-        // tidak ketiban rata-atas/wrap, dan setelah merge supaya gayanya menempel
-        // di sel kiri-atas gabungan A..W.
+        // Judul wilayah di baris 3 (A..J) + grand total alokasi semua strategi di
+        // kolom K, sejajar seperti baris judul strategi. Latar oranye.
+        $sheet->mergeCells('A3:J3');
+        $title = $sheet->getStyle("A3:{$last_column}3");
+        $title->getFont()->setBold(true);
+        $title->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFC000');
+        $title->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A3:J3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+        $sheet->getStyle("K3:{$last_column}3")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+        // Baris judul Strategi OPPKPE + total alokasi anggarannya. Dipasang setelah
+        // gaya isi di atas supaya tidak ketiban rata-atas/wrap. Judul merge A..J,
+        // angkanya di kolom K supaya sejajar kolom "Alokasi Anggaran".
         foreach ($this->separator_rows as $separator_row) {
-            $sheet->mergeCells("A{$separator_row}:{$last_column}{$separator_row}");
+            $sheet->mergeCells("A{$separator_row}:J{$separator_row}");
             $separator = $sheet->getStyle("A{$separator_row}:{$last_column}{$separator_row}");
             $separator->getFont()->setBold(true);
             $separator->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFD9D9D9');
             $separator->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-            $separator->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("A{$separator_row}:J{$separator_row}")
+                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("K{$separator_row}:{$last_column}{$separator_row}")
+                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         }
 
         // Lebar kolom: pendek tetap, teks panjang dibatasi.
@@ -230,8 +268,8 @@ class ProgramExport implements FromView, WithStyles
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        // Header tetap terlihat saat discroll.
-        $sheet->freezePane('A3');
+        // Header + judul wilayah tetap terlihat saat discroll.
+        $sheet->freezePane('A4');
     }
 
     /**

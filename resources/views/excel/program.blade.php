@@ -35,11 +35,33 @@
         @php
             $i = 1;
         @endphp
+        {{-- Baris judul wilayah + grand total semua strategi: alokasi di kolom K (11),
+             realisasi per triwulan + totalnya di kolom S..W (19..23). Kolom L..R
+             dibiarkan kosong supaya jumlah sel tetap 23. --}}
+        <tr>
+            <td colspan="10">KABUPATEN LEBAK</td>
+            <td>{{ $grand_total['budget_allocation'] }}</td>
+            <td colspan="7"></td>
+            <td>{{ $grand_total['realization_q1'] }}</td>
+            <td>{{ $grand_total['realization_q2'] }}</td>
+            <td>{{ $grand_total['realization_q3'] }}</td>
+            <td>{{ $grand_total['realization_q4'] }}</td>
+            <td>{{ $grand_total['realization_total'] }}</td>
+        </tr>
         {{-- Satu tabel, satu header. Tiap Strategi OPPKPE dibuka baris pemisah
              (colspan 23 = seluruh kolom A..W). --}}
         @foreach($groups as $strategi => $records)
+            {{-- Judul strategi (A..J) + totalnya sejajar: alokasi di kolom K (11),
+                 realisasi per triwulan + totalnya di kolom S..W (19..23). --}}
             <tr>
-                <td colspan="23">{{ $strategi }}</td>
+                <td colspan="10">{{ $strategi }}</td>
+                <td>{{ $totals[$strategi]['budget_allocation'] }}</td>
+                <td colspan="7"></td>
+                <td>{{ $totals[$strategi]['realization_q1'] }}</td>
+                <td>{{ $totals[$strategi]['realization_q2'] }}</td>
+                <td>{{ $totals[$strategi]['realization_q3'] }}</td>
+                <td>{{ $totals[$strategi]['realization_q4'] }}</td>
+                <td>{{ $totals[$strategi]['realization_total'] }}</td>
             </tr>
             @foreach($records as $record)
             <tr>
@@ -72,6 +94,8 @@
                 $i++;
             @endphp
             @endforeach
+            {{-- Subtotal alokasi anggaran per Strategi OPPKPE. Label di A (merge A..J),
+                 angkanya di kolom K supaya sejajar di bawah kolom "Alokasi Anggaran". --}}
         @endforeach
     </tbody>
 </table>
