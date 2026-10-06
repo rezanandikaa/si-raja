@@ -3,39 +3,56 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
+use App\Libraries\SheetReader;
 use App\Models\Master\Mt_destitution_nik;
+use App\Models\System\Sy_file;
 use App\Models\Transaction\Tr_program_realization_bnba;
 use App\Repositories\CompileRepository;
 use App\Repositories\Master\DestitutionNikRepository;
+use App\Repositories\System\FileRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
 
 class DestitutionNikController extends Controller
 {
+    /**
+     * Baris pratinjau yang diambil sekali baca, sama dengan halaman DTSEN KK:
+     * buka workbook yang mahal, sisanya di-paginate di browser.
+     */
+    private const PREVIEW_ROWS = 500;
+
     protected $route_prefix;
     protected $compile_repo;
     protected $destitution_nik_repo;
+    protected $file_repo;
 
     public function __construct(
         CompileRepository $compile_repo,
-        DestitutionNikRepository $destitution_nik_repo
+        DestitutionNikRepository $destitution_nik_repo,
+        FileRepository $file_repo
     )
     {
         $this->route_prefix = 'master.destitution_nik.';
         $this->compile_repo = $compile_repo;
         $this->destitution_nik_repo = $destitution_nik_repo;
+        $this->file_repo = $file_repo;
     }
 
     public function list()
     {
         $data = [
-            '_be_page_title' => 'Daftar P3KE Individu',
-            '_be_page_title_desc' => 'Halaman ini adalah semua daftar P3KE Individu',
-            '_be_breadcrumbs' => ['Master Data','Master P3KE Individu','Daftar P3KE Individu'],
-            '_be_insert' => '#'
+            '_be_page_title' => 'Daftar DTSEN ART',
+            '_be_page_title_desc' => 'Halaman ini adalah semua daftar DTSEN ART',
+            '_be_breadcrumbs' => ['Master Data','Master DTSEN ART','Daftar DTSEN ART'],
+            '_be_insert' => '#',
+            // Unggahan terakhir diingat di session supaya pratinjaunya tetap
+            // ada setelah halaman ditinggal atau di-refresh.
+            '_be_preview_batch' => session('destitution_nik_last_batch'),
+            '_be_preview_sheet' => session('destitution_nik_last_sheet'),
         ];
         return view('backpage.master_destitution_nik.list',compact('data'));
     }
@@ -203,10 +220,10 @@ class DestitutionNikController extends Controller
         $data = [
             'fields' => $this->get_form(),
             'datas' => [],
-            '_be_page_title' => 'Tambah P3KE Individu',
-            '_be_page_title_desc' => 'Halaman ini untuk menambahkan P3KE Individu baru',
-            '_be_breadcrumbs' => ['Master Data','Master P3KE Individu','Tambah P3KE Individu'],
-            '_be_card_title' => 'Tambah P3KE Individu',
+            '_be_page_title' => 'Tambah DTSEN ART',
+            '_be_page_title_desc' => 'Halaman ini untuk menambahkan DTSEN ART baru',
+            '_be_breadcrumbs' => ['Master Data','Master DTSEN ART','Tambah DTSEN ART'],
+            '_be_card_title' => 'Tambah DTSEN ART',
             '_be_btn_label' => 'Simpan',
             '_be_btn_variant' => 'primary',
             '_be_method' => 'POST',
@@ -243,7 +260,7 @@ class DestitutionNikController extends Controller
                 'status' => 'OK',
                 'message' => 'Data tersimpan'
             ];
-            logbook('Berhasil menambahkan P3KE Individu', 201);
+            logbook('Berhasil menambahkan DTSEN ART', 201);
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -254,6 +271,114 @@ class DestitutionNikController extends Controller
             ];
         }
         return response()->json($result);
+    }
+
+    /**
+     * Unggah berkas DTSEN ART (Excel) ke antrian impor.
+     * Baris sy_file bertipe INDIVIDU diproses `php artisan baduyengine:import`
+     * lalu `php artisan baduyengine:sync` yang mengisi mt_destitution_nik.
+     */
+    public function upload(Request $request)
+    {
+        // Hanya .xlsx: pembaca streaming (SheetReader) tidak mendukung .xls lama.
+        $validated = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:xlsx',
+        ]);
+        if($validated->fails()){
+            return response()->json([
+                'status' => 'FAIL',
+                'message' => $validated->getMessageBag()->first()
+            ]);
+        }
+
+        try {
+            DB::beginTransaction();
+            $file = $request->file('file');
+            $extension = strtolower($file->getClientOriginalExtension());
+
+            // batch_code unik 5 karakter; dipakai sebagai nama berkas di storage.
+            do {
+                $batch_code = strtoupper(Str::random(5));
+            } while (Sy_file::where('batch_code', $batch_code)->exists());
+
+            $file_name = $batch_code . '.' . $extension;
+            $file->storeAs('public/', $file_name);
+
+            $this->file_repo->insertRecord([
+                'data_id' => source_data_active(),
+                'batch_code' => $batch_code,
+                'file_name_original' => $file->getClientOriginalName(),
+                'extension' => $extension,
+                'type' => 'INDIVIDU',
+                'size' => $file->getSize() / 1000,
+                'path' => 'app/public/' . $file_name,
+                'is_sync' => false,
+            ]);
+
+            logbook('Berhasil mengunggah berkas DTSEN ART', 201);
+            DB::commit();
+
+            session([
+                'destitution_nik_last_batch' => $batch_code,
+                'destitution_nik_last_sheet' => SheetReader::SHEET_ART,
+            ]);
+
+            // Pratinjau dibaca setelah commit, dari berkas yang sudah tersimpan.
+            $result = [
+                'status' => 'OK',
+                'message' => 'Berkas masuk antrian impor',
+                'batch_code' => $batch_code,
+                'preview' => $this->buildPreview(storage_path('app/public/' . $file_name), SheetReader::SHEET_ART),
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            logbook($e->getMessage(), $e->getCode());
+            $result = [
+                'status' => 'FAIL',
+                'message' => $e->getMessage()
+            ];
+        }
+        return response()->json($result);
+    }
+
+    /**
+     * Pratinjau satu sheet dari berkas yang sudah diunggah, dipakai pemilih
+     * sheet di halaman. Sumber berkas selalu dari kolom path di sy_file,
+     * bukan dari input, jadi tidak ada path dari pengguna.
+     */
+    public function preview(Request $request)
+    {
+        $sy_file = Sy_file::where('batch_code', $request->input('batch_code'))
+            ->where('data_id', source_data_active())
+            ->first();
+
+        if ($sy_file == null) {
+            return response()->json(['status' => 'FAIL', 'message' => 'Berkas tidak ditemukan']);
+        }
+
+        // Ingat sheet yang sedang dilihat, dipakai lagi saat halaman dibuka ulang.
+        if ($request->input('sheet') != null) {
+            session(['destitution_nik_last_sheet' => $request->input('sheet')]);
+        }
+
+        return response()->json([
+            'status' => 'OK',
+            'preview' => $this->buildPreview(storage_path($sy_file->path), $request->input('sheet')),
+        ]);
+    }
+
+    /**
+     * Baca cuplikan sheet. Null kalau berkas tidak terbaca — unggahan tetap
+     * dianggap berhasil, halaman cuma kehilangan pratinjaunya.
+     */
+    private function buildPreview($path, $sheet_name)
+    {
+        try {
+            return (new SheetReader())->preview($path, $sheet_name, self::PREVIEW_ROWS);
+        } catch (\Exception $e) {
+            logbook($e->getMessage(), $e->getCode());
+            return null;
+        }
     }
 
     public function edit($id)
@@ -270,10 +395,10 @@ class DestitutionNikController extends Controller
         $data = [
             'fields' => $this->get_form(),
             'datas' => $datas,
-            '_be_page_title' => 'Ubah P3KE Individu',
-            '_be_page_title_desc' => 'Halaman ini untuk mengubah / mengedit P3KE Individu',
-            '_be_breadcrumbs' => ['Master Data','Master P3KE Individu','Ubah P3KE Individu'],
-            '_be_card_title' => 'Ubah P3KE Individu',
+            '_be_page_title' => 'Ubah DTSEN ART',
+            '_be_page_title_desc' => 'Halaman ini untuk mengubah / mengedit DTSEN ART',
+            '_be_breadcrumbs' => ['Master Data','Master DTSEN ART','Ubah DTSEN ART'],
+            '_be_card_title' => 'Ubah DTSEN ART',
             '_be_btn_label' => 'Simpan',
             '_be_btn_variant' => 'primary',
             '_be_method' => 'PUT',
@@ -314,7 +439,7 @@ class DestitutionNikController extends Controller
                 'status' => 'OK',
                 'message' => 'Data tersimpan'
             ];
-            logbook('Berhasil mengubah P3KE Individu Pengguna');
+            logbook('Berhasil mengubah DTSEN ART Pengguna');
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -338,7 +463,7 @@ class DestitutionNikController extends Controller
                     'status' => 'OK',
                     'message' => 'Data dihapus'
                 ];
-                logbook('Berhasil menghapus P3KE Individu Pengguna');
+                logbook('Berhasil menghapus DTSEN ART Pengguna');
                 DB::commit();
             } catch (\Exception $e) {
                 DB::rollBack();
@@ -361,10 +486,10 @@ class DestitutionNikController extends Controller
 
         $data = [
             'datas' => $record->toArray(),
-            '_be_page_title' => 'Detail P3KE Individu',
-            '_be_page_title_desc' => 'Halaman ini adalah Detail P3KE Individu',
-            '_be_breadcrumbs' => ['Master Data','Master P3KE Individu','Detail P3KE Individu'],
-            '_be_card_title' => 'Detail P3KE Individu',
+            '_be_page_title' => 'Detail DTSEN ART',
+            '_be_page_title_desc' => 'Halaman ini adalah Detail DTSEN ART',
+            '_be_breadcrumbs' => ['Master Data','Master DTSEN ART','Detail DTSEN ART'],
+            '_be_card_title' => 'Detail DTSEN ART',
             '_be_home' => route('master.destitution_nik.list'),
             '_parent_id' => $id,
         ];

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Libraries\DtsenDocumentMapper;
 use App\Repositories\CompileRepository;
 use App\Repositories\Master\DashboardRepository;
 use App\Repositories\Master\DestitutionKkRepository;
@@ -14,6 +15,7 @@ use App\Repositories\Transaction\ProgramRepository;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Intervention\Image\Facades\Image;
@@ -71,6 +73,115 @@ class AjaxController extends Controller
         return response()->json($records);
     }
 
+    /**
+     * Potongan kondisi "kolom = nilai" untuk peta.
+     *
+     * Kolomnya harus ada di daftar kolom sisi server, nilainya di-quote lewat
+     * PDO — properti dashboard tidak boleh bisa menyusupkan SQL.
+     */
+    protected function mapFilterCondition($source, $table_name, $props)
+    {
+        $column = $props['column'] ?? null;
+        $value = $props['value'] ?? null;
+        if ($value === null || $value === '' || !$this->chartColumnAllowed($source, $column)) {
+            return '';
+        }
+
+        return " and {$table_name}.{$column} = " . DB::getPdo()->quote((string) $value);
+    }
+
+    /**
+     * Daftar kolom yang boleh disebut properti grafik untuk satu sumber.
+     *
+     * Selalu daftar kolom sungguhan dari sisi server, tidak pernah dari
+     * request: nama kolom ikut masuk SQL, jadi asalnya harus tetap.
+     */
+    protected function allowedChartColumns($source)
+    {
+        $document_type = DtsenDocumentMapper::typeForSource($source);
+        if ($document_type !== null) {
+            $table_name = $document_type == DtsenDocumentMapper::TYPE_ART
+                ? 'mt_destitution_nik'
+                : 'mt_destitution_kk';
+
+            // Kolom dokumen untuk grafik baru, ditambah kolom tabel supaya
+            // dashboard lama yang menyebut kolom tabel tetap jalan.
+            return array_merge(DtsenDocumentMapper::columns($document_type), Schema::getColumnListing($table_name));
+        }
+        if ($source == 'PROGRAM') {
+            return Schema::getColumnListing('tr_program');
+        }
+        if ($source == 'REALISASI') {
+            return Schema::getColumnListing('tr_program_realization');
+        }
+
+        return [];
+    }
+
+    /**
+     * Kolom kosong berarti properti itu tidak menyaring apa pun, bukan
+     * pelanggaran. Kolom di luar daftar ditolak.
+     */
+    protected function chartColumnAllowed($source, $column)
+    {
+        if ($column === null || $column === '') {
+            return true;
+        }
+
+        return in_array($column, $this->allowedChartColumns($source), true);
+    }
+
+    /**
+     * Grafik yang dikelompokkan langsung menurut kolom dokumen DTSEN.
+     *
+     * Dipakai kalau "Kelompokkan Berdasarkan" dikosongkan: satu query GROUP BY,
+     * bukan satu query per pilihan sy_option seperti jalur lama. Kolom yang
+     * tidak ada di daftar putih DtsenDocumentMapper ditolak — nilainya ikut
+     * masuk SQL.
+     *
+     * @return array{labels: array, values: array}|null null kalau properti ini
+     *         bukan mode kelompok-kolom.
+     */
+    protected function documentGroupedSeries($record, $props)
+    {
+        $document_type = DtsenDocumentMapper::typeForSource($record->source);
+        if ($document_type === null || !empty($props['key'])) {
+            return null;
+        }
+
+        $allowed = DtsenDocumentMapper::columns($document_type);
+        $column = $props['column'] ?? null;
+        if (!in_array($column, $allowed, true)) {
+            return null;
+        }
+
+        $sum_column = (($props['type'] ?? null) == 'SUM' && in_array($props['value'] ?? null, $allowed, true))
+            ? $props['value']
+            : null;
+
+        $table_name = $document_type == DtsenDocumentMapper::TYPE_ART
+            ? 'mt_destitution_nik'
+            : 'mt_destitution_kk';
+
+        $condition = "1=1";
+        // Nilai dari request dicor ke angka dulu sebelum disusun jadi kondisi.
+        if (!empty($props['district_id']) && !empty($props['subdistrict_id'])) {
+            $condition .= " and {$table_name}.district_id = '" . (int) $props['district_id'] . "'";
+            $condition .= " and {$table_name}.subdistrict_id = '" . (int) $props['subdistrict_id'] . "'";
+        }
+
+        $repo = $document_type == DtsenDocumentMapper::TYPE_ART
+            ? $this->destitution_nik_repo
+            : $this->destitution_kk_repo;
+
+        $rows = $repo->getGroupedByColumn($column, $condition, $sum_column);
+
+        return [
+            'labels' => $rows->pluck('label')->all(),
+            'values' => $rows->pluck('total')->all(),
+        ];
+    }
+
     public function chart(Request $request)
     {
         $user = Auth::user();
@@ -88,6 +199,21 @@ class AjaxController extends Controller
         switch ($record->type) {
             case 'PIE':
                 $props = json_decode($record->properties, true);
+                if (!$this->chartColumnAllowed($record->source, $props['column'] ?? null)
+                    || !$this->chartColumnAllowed($record->source, $props['value'] ?? null)) {
+                    break;
+                }
+                $grouped = $this->documentGroupedSeries($record, $props);
+                if ($grouped !== null) {
+                    foreach ($grouped['labels'] as $i => $label) {
+                        $datas['pie'][] = [
+                            'name' => $label,
+                            'y' => $grouped['values'][$i],
+                            'permalink' => route('bnba.detail', ['source' => 'dashboard', 'dashboard_id' => $record->id]),
+                        ];
+                    }
+                    break;
+                }
                 if (count($props) > 0) {
                     $options = $this->option_repo->getRecordsByCode($props['key']);
                     $condition = "1=1";
@@ -184,9 +310,7 @@ class AjaxController extends Controller
                             } else {
                                 $condition = "{$table_name}.subdistrict_id = '{$region->id}'";
                             }
-                            if (isset($props['column']) && isset($props['value']) && $props['column'] != '' && $props['value'] != '' && $props['column'] != null && $props['value'] != null) {
-                                $condition .= " and {$table_name}.{$props['column']} = '{$props['value']}'";
-                            }
+                            $condition .= $this->mapFilterCondition($record->source, $table_name, $props);
                             $count = $this->destitution_nik_repo->getTotalRecordsByCond($condition);
                             $data['hc-key'] = $region->code;
                             $data['value'] = $count;
@@ -292,8 +416,18 @@ class AjaxController extends Controller
                 break;
             case 'BAR':
                 $props = json_decode($record->properties, true);
+                if (!$this->chartColumnAllowed($record->source, $props['column'] ?? null)
+                    || !$this->chartColumnAllowed($record->source, $props['value'] ?? null)) {
+                    break;
+                }
                 $datas['bar']['interval'] = (isset($props['interval']) ? (int) $props['interval'] : 1);
                 $datas['bar']['permalink'] = route('bnba.detail', ['source' => 'dashboard', 'dashboard_id' => $record->id]);
+                $grouped = $this->documentGroupedSeries($record, $props);
+                if ($grouped !== null) {
+                    $datas['bar']['x_axis'] = $grouped['labels'];
+                    $datas['bar']['value'] = $grouped['values'];
+                    break;
+                }
                 if (count($props) > 0) {
                     $options = $this->option_repo->getRecordsByCode($props['key']);
                     $condition = "1=1";
@@ -381,8 +515,18 @@ class AjaxController extends Controller
                 break;
             case 'COLUMN':
                 $props = json_decode($record->properties, true);
+                if (!$this->chartColumnAllowed($record->source, $props['column'] ?? null)
+                    || !$this->chartColumnAllowed($record->source, $props['value'] ?? null)) {
+                    break;
+                }
                 $datas['column']['interval'] = (isset($props['interval']) ? (int) $props['interval'] : 1);
                 $datas['column']['permalink'] = route('bnba.detail', ['source' => 'dashboard', 'dashboard_id' => $record->id]);
+                $grouped = $this->documentGroupedSeries($record, $props);
+                if ($grouped !== null) {
+                    $datas['column']['x_axis'] = $grouped['labels'];
+                    $datas['column']['value'] = $grouped['values'];
+                    break;
+                }
                 if (count($props) > 0) {
                     $options = $this->option_repo->getRecordsByCode($props['key']);
                     $condition = "1=1";

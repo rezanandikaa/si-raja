@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Master;
 
+use App\Libraries\DtsenDocumentMapper;
 use App\Models\Master\Mt_destitution_nik;
 
 class DestitutionNikRepository
@@ -98,6 +99,53 @@ class DestitutionNikRepository
             )
             ->get();
         return $records->sum($sum_column);
+    }
+
+    /**
+     * Kelompokkan langsung menurut satu kolom dokumen (desil, rt, rw, dusun,
+     * kecamatan, …) tanpa lewat tabel pilihan sy_option.
+     *
+     * $column dan $sum_column wajib ada di daftar putih DtsenDocumentMapper:
+     * nilainya ikut masuk SQL, jadi jangan pernah kirim mentah dari request.
+     *
+     * @return \Illuminate\Support\Collection baris {label, total}
+     */
+    public function getGroupedByColumn($column, $condition = "1=1", $sum_column = null)
+    {
+        $allowed = DtsenDocumentMapper::columns(DtsenDocumentMapper::TYPE_ART);
+        if (!in_array($column, $allowed, true)) {
+            throw new \InvalidArgumentException("Kolom grafik tidak dikenal: {$column}");
+        }
+        if ($sum_column !== null && !in_array($sum_column, $allowed, true)) {
+            throw new \InvalidArgumentException("Kolom jumlah tidak dikenal: {$sum_column}");
+        }
+
+        $query = $this->model
+            ->where($this->table_name.'.data_id', source_data_active())
+            ->whereRaw($condition)
+            ->whereNull($this->table_name.'.deleted_at')
+            ->when(get_preference('default_percentile', 2) > 0, function ($q) {
+                $q->where($this->table_name.'.percentile', '<=', get_preference('default_percentile', 2));
+            });
+
+        // Kolom wilayah tersimpan sebagai id; yang dibaca orang namanya.
+        $is_region = in_array($column, ['province_id', 'regency_id', 'district_id', 'subdistrict_id'], true);
+        if ($is_region) {
+            $query->leftJoin('mt_region', $this->table_name.'.'.$column, 'mt_region.id');
+        }
+
+        $label = $is_region
+            ? 'COALESCE(mt_region.name, "(tidak diketahui)")'
+            : $this->table_name.'.'.$column;
+        $total = $sum_column === null ? 'COUNT(*)' : 'SUM('.$this->table_name.'.'.$sum_column.')';
+
+        // label untuk yang dibaca orang, value untuk menyaring baris (kolom
+        // wilayah isinya id, bukan nama).
+        return $query
+            ->selectRaw("{$label} as label, {$this->table_name}.{$column} as value, {$total} as total")
+            ->groupByRaw("{$label}, {$this->table_name}.{$column}")
+            ->orderByRaw($label)
+            ->get();
     }
 
     public function getTotalRecordsByCond($condition = "1=1")

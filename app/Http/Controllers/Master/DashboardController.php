@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
+use App\Libraries\DtsenDocumentMapper;
 use App\Models\Master\Mt_dashboard;
 use App\Repositories\CompileRepository;
 use App\Repositories\Master\DashboardRepository;
@@ -57,6 +58,10 @@ class DashboardController extends Controller
                 ->editColumn('updated_at', function($data) {
                     return Carbon::parse($data->updated_at)->format('Y-m-d H:i');
                 })
+                // Teksnya disamakan dengan dropdown Sumber Data di form.
+                ->editColumn('source', function($data) {
+                    return self::sourceLabel($data->source);
+                })
                 ->editColumn('active_flag', function($data) {
                     return '<span class="badge light badge-'.($data->active_flag ? 'success':'danger').'">'.($data->active_flag ? 'Aktif':'Nonaktif').'</span>';
                 })
@@ -85,6 +90,33 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * Satu-satunya tempat teks "Sumber Data" didefinisikan: dipakai dropdown di
+     * form dan kolom di tabel daftar supaya keduanya tidak beda lagi. Kuncinya
+     * kode lama yang tersimpan di mt_dashboard.source — jangan diubah, baris
+     * lama dan cabang di AjaxController/BnbaController memakai kode itu.
+     */
+    private const SOURCE_LABELS = [
+        'P3KE-INDIVIDU' => 'DTSEN ART',
+        'P3KE-KEPALA-KELUARGA' => 'DTSEN KK',
+        'PROGRAM' => 'PROGRAM',
+        'REALISASI' => 'REALISASI',
+    ];
+
+    private static function sourceLabel($source)
+    {
+        return self::SOURCE_LABELS[$source] ?? $source;
+    }
+
+    /**
+     * Sumber data mana yang isinya dokumen DTSEN, dan tipe dokumennya apa.
+     * Null berarti sumbernya bukan dokumen (PROGRAM / REALISASI).
+     */
+    private static function documentType($source)
+    {
+        return DtsenDocumentMapper::typeForSource($source);
+    }
+
     public function get_form()
     {
         $fields = [];
@@ -105,7 +137,10 @@ class DashboardController extends Controller
             'name' => 'source',
             'placeholder' => 'Sumber Data',
             'type' => 'select',
-            'options' => ['P3KE-INDIVIDU', 'P3KE-KEPALA-KELUARGA', 'PROGRAM', 'REALISASI'],
+            // Nilai yang disimpan tetap kode lama, labelnya dari SOURCE_LABELS.
+            'options' => array_map(function ($value, $label) {
+                return ['value' => $value, 'label' => $label];
+            }, array_keys(self::SOURCE_LABELS), self::SOURCE_LABELS),
             'required' => true,
             'show_only' => false,
             'validate_message' => 'Sumber Data wajib diisi'
@@ -139,11 +174,12 @@ class DashboardController extends Controller
     {
         $fields = [];
         $columns = [];
-        if ($record['source'] == 'P3KE-INDIVIDU') {
-            $columns = Schema::getColumnListing('mt_destitution_nik');
-        }
-        if ($record['source'] == 'P3KE-KEPALA-KELUARGA') {
-            $columns = Schema::getColumnListing('mt_destitution_kk');
+
+        // Sumber DTSEN (dokumen KK/ART) menawarkan kolom dokumen, bukan kolom
+        // tabel: itu yang dikenali pengguna dan itu yang diisi hasil impor.
+        $document_type = self::documentType($record['source']);
+        if ($document_type !== null) {
+            $columns = DtsenDocumentMapper::columnOptions($document_type);
         }
         if ($record['source'] == 'PROGRAM') {
             $columns = Schema::getColumnListing('tr_program');
@@ -156,20 +192,29 @@ class DashboardController extends Controller
             case 'PIE':
             case 'BAR':
             case 'COLUMN':
+                // Sumber dokumen tidak punya tabel pilihan: kalau "Kelompokkan
+                // Berdasarkan" dibiarkan kosong, grafik dikelompokkan langsung
+                // menurut kolom dokumen yang dipilih di bawah.
+                $grouped_by_document_column = $document_type !== null;
+
                 $fields['key'] = [
-                    'label' => 'Kelompokkan Berdasarkan',
+                    'label' => $grouped_by_document_column
+                        ? 'Kelompokkan Berdasarkan Pilihan (opsional — kosongkan untuk kelompok per kolom dokumen)'
+                        : 'Kelompokkan Berdasarkan',
                     'name' => 'key',
                     'placeholder' => 'Kelompokkan Berdasarkan',
                     'type' => 'data',
                     'data_table' => 'custom_options',
                     'data_condition' => '',
                     'data_extra' => '',
-                    'required' => true,
+                    'required' => !$grouped_by_document_column,
                     'show_only' => false,
                     'validate_message' => 'Kelompokkan Berdasarkan wajib diisi'
                 ];
                 $fields['column'] = [
-                    'label' => 'Kolom Kelompok (kolom penyimpan id pilihan di atas)',
+                    'label' => $grouped_by_document_column
+                        ? 'Kolom Dokumen yang Dikelompokkan'
+                        : 'Kolom Kelompok (kolom penyimpan id pilihan di atas)',
                     'name' => 'column',
                     'placeholder' => 'Kolom Kelompok',
                     'type' => 'select',

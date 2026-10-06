@@ -3,40 +3,58 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
+use App\Libraries\SheetReader;
 use App\Models\Master\Mt_destitution_kk;
+use App\Models\System\Sy_file;
 use App\Models\System\Sy_option;
 use App\Models\Transaction\Tr_program_realization_bnba;
 use App\Repositories\CompileRepository;
 use App\Repositories\Master\DestitutionKkRepository;
+use App\Repositories\System\FileRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
 
 class DestitutionKkController extends Controller
 {
+    /**
+     * Baris pratinjau yang diambil sekali baca. Membaca berkas ini yang mahal
+     * (buka workbook 6-9 detik), menambah baris cuma ~0,75 ms per baris.
+     * Sisanya di-paginate di browser, bukan diambil ulang per halaman.
+     */
+    private const PREVIEW_ROWS = 500;
+
     protected $route_prefix;
     protected $compile_repo;
     protected $destitution_kk_repo;
+    protected $file_repo;
 
     public function __construct(
         CompileRepository $compile_repo,
-        DestitutionKkRepository $destitution_kk_repo
+        DestitutionKkRepository $destitution_kk_repo,
+        FileRepository $file_repo
     )
     {
         $this->route_prefix = 'master.destitution_kk.';
         $this->compile_repo = $compile_repo;
         $this->destitution_kk_repo = $destitution_kk_repo;
+        $this->file_repo = $file_repo;
     }
 
     public function list()
     {
         $data = [
-            '_be_page_title' => 'Daftar P3KE Kepala Keluarga',
-            '_be_page_title_desc' => 'Halaman ini adalah semua daftar P3KE Kepala Keluarga',
-            '_be_breadcrumbs' => ['Master Data','Master P3KE Kepala Keluarga','Daftar P3KE Kepala Keluarga'],
-            '_be_insert' => route('master.destitution_kk.insert')
+            '_be_page_title' => 'Daftar DTSEN KK',
+            '_be_page_title_desc' => 'Halaman ini adalah semua daftar DTSEN KK',
+            '_be_breadcrumbs' => ['Master Data','Master DTSEN KK','Daftar DTSEN KK'],
+            '_be_insert' => route('master.destitution_kk.insert'),
+            // Unggahan terakhir diingat di session supaya pratinjaunya tetap
+            // ada setelah halaman ditinggal atau di-refresh.
+            '_be_preview_batch' => session('destitution_kk_last_batch'),
+            '_be_preview_sheet' => session('destitution_kk_last_sheet'),
         ];
         return view('backpage.master_destitution_kk.list',compact('data'));
     }
@@ -270,10 +288,10 @@ class DestitutionKkController extends Controller
         $data = [
             'fields' => $this->get_form(),
             'datas' => [],
-            '_be_page_title' => 'Tambah P3KE Kepala Keluarga',
-            '_be_page_title_desc' => 'Halaman ini untuk menambahkan P3KE Kepala Keluarga baru',
-            '_be_breadcrumbs' => ['Master Data','Master P3KE Kepala Keluarga','Tambah P3KE Kepala Keluarga'],
-            '_be_card_title' => 'Tambah P3KE Kepala Keluarga',
+            '_be_page_title' => 'Tambah DTSEN KK',
+            '_be_page_title_desc' => 'Halaman ini untuk menambahkan DTSEN KK baru',
+            '_be_breadcrumbs' => ['Master Data','Master DTSEN KK','Tambah DTSEN KK'],
+            '_be_card_title' => 'Tambah DTSEN KK',
             '_be_btn_label' => 'Simpan',
             '_be_btn_variant' => 'primary',
             '_be_method' => 'POST',
@@ -314,7 +332,7 @@ class DestitutionKkController extends Controller
                 'status' => 'OK',
                 'message' => 'Data tersimpan'
             ];
-            logbook('Berhasil menambahkan P3KE Kepala Keluarga', 201);
+            logbook('Berhasil menambahkan DTSEN KK', 201);
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -325,6 +343,114 @@ class DestitutionKkController extends Controller
             ];
         }
         return response()->json($result);
+    }
+
+    /**
+     * Unggah berkas DTSEN KK (Excel/CSV) ke antrian impor.
+     * Baris sy_file bertipe KEPALA-KELUARGA diproses `php artisan baduyengine:import`
+     * lalu `php artisan baduyengine:sync` yang mengisi mt_destitution_kk.
+     */
+    public function upload(Request $request)
+    {
+        // Hanya .xlsx: pembaca streaming (SheetReader) tidak mendukung .xls lama.
+        $validated = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:xlsx',
+        ]);
+        if($validated->fails()){
+            return response()->json([
+                'status' => 'FAIL',
+                'message' => $validated->getMessageBag()->first()
+            ]);
+        }
+
+        try {
+            DB::beginTransaction();
+            $file = $request->file('file');
+            $extension = strtolower($file->getClientOriginalExtension());
+
+            // batch_code unik 5 karakter; dipakai sebagai nama berkas di storage.
+            do {
+                $batch_code = strtoupper(Str::random(5));
+            } while (Sy_file::where('batch_code', $batch_code)->exists());
+
+            $file_name = $batch_code . '.' . $extension;
+            $file->storeAs('public/', $file_name);
+
+            $this->file_repo->insertRecord([
+                'data_id' => source_data_active(),
+                'batch_code' => $batch_code,
+                'file_name_original' => $file->getClientOriginalName(),
+                'extension' => $extension,
+                'type' => 'KEPALA-KELUARGA',
+                'size' => $file->getSize() / 1000,
+                'path' => 'app/public/' . $file_name,
+                'is_sync' => false,
+            ]);
+
+            logbook('Berhasil mengunggah berkas DTSEN KK', 201);
+            DB::commit();
+
+            session([
+                'destitution_kk_last_batch' => $batch_code,
+                'destitution_kk_last_sheet' => SheetReader::SHEET_KK,
+            ]);
+
+            // Pratinjau dibaca setelah commit, dari berkas yang sudah tersimpan.
+            $result = [
+                'status' => 'OK',
+                'message' => 'Berkas masuk antrian impor',
+                'batch_code' => $batch_code,
+                'preview' => $this->buildPreview(storage_path('app/public/' . $file_name), SheetReader::SHEET_KK),
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            logbook($e->getMessage(), $e->getCode());
+            $result = [
+                'status' => 'FAIL',
+                'message' => $e->getMessage()
+            ];
+        }
+        return response()->json($result);
+    }
+
+    /**
+     * Pratinjau satu sheet dari berkas yang sudah diunggah, dipakai pemilih
+     * sheet di halaman. Sumber berkas selalu dari kolom path di sy_file,
+     * bukan dari input, jadi tidak ada path dari pengguna.
+     */
+    public function preview(Request $request)
+    {
+        $sy_file = Sy_file::where('batch_code', $request->input('batch_code'))
+            ->where('data_id', source_data_active())
+            ->first();
+
+        if ($sy_file == null) {
+            return response()->json(['status' => 'FAIL', 'message' => 'Berkas tidak ditemukan']);
+        }
+
+        // Ingat sheet yang sedang dilihat, dipakai lagi saat halaman dibuka ulang.
+        if ($request->input('sheet') != null) {
+            session(['destitution_kk_last_sheet' => $request->input('sheet')]);
+        }
+
+        return response()->json([
+            'status' => 'OK',
+            'preview' => $this->buildPreview(storage_path($sy_file->path), $request->input('sheet')),
+        ]);
+    }
+
+    /**
+     * Baca cuplikan sheet. Null kalau berkas tidak terbaca — unggahan tetap
+     * dianggap berhasil, halaman cuma kehilangan pratinjaunya.
+     */
+    private function buildPreview($path, $sheet_name)
+    {
+        try {
+            return (new SheetReader())->preview($path, $sheet_name, self::PREVIEW_ROWS);
+        } catch (\Exception $e) {
+            logbook($e->getMessage(), $e->getCode());
+            return null;
+        }
     }
 
     public function edit($id)
@@ -340,10 +466,10 @@ class DestitutionKkController extends Controller
         $data = [
             'fields' => $this->get_form(),
             'datas' => $datas,
-            '_be_page_title' => 'Ubah P3KE Kepala Keluarga',
-            '_be_page_title_desc' => 'Halaman ini untuk mengubah / mengedit P3KE Kepala Keluarga',
-            '_be_breadcrumbs' => ['Master Data','Master P3KE Kepala Keluarga','Ubah P3KE Kepala Keluarga'],
-            '_be_card_title' => 'Ubah P3KE Kepala Keluarga',
+            '_be_page_title' => 'Ubah DTSEN KK',
+            '_be_page_title_desc' => 'Halaman ini untuk mengubah / mengedit DTSEN KK',
+            '_be_breadcrumbs' => ['Master Data','Master DTSEN KK','Ubah DTSEN KK'],
+            '_be_card_title' => 'Ubah DTSEN KK',
             '_be_btn_label' => 'Simpan',
             '_be_btn_variant' => 'primary',
             '_be_method' => 'PUT',
@@ -380,7 +506,7 @@ class DestitutionKkController extends Controller
                 'status' => 'OK',
                 'message' => 'Data tersimpan'
             ];
-            logbook('Berhasil mengubah P3KE Kepala Keluarga Pengguna');
+            logbook('Berhasil mengubah DTSEN KK Pengguna');
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -404,7 +530,7 @@ class DestitutionKkController extends Controller
                     'status' => 'OK',
                     'message' => 'Data dihapus'
                 ];
-                logbook('Berhasil menghapus P3KE Kepala Keluarga Pengguna');
+                logbook('Berhasil menghapus DTSEN KK Pengguna');
                 DB::commit();
             } catch (\Exception $e) {
                 DB::rollBack();
@@ -427,10 +553,10 @@ class DestitutionKkController extends Controller
 
         $data = [
             'datas' => $record->toArray(),
-            '_be_page_title' => 'Detail P3KE Kepala Keluarga',
-            '_be_page_title_desc' => 'Halaman ini adalah Detail P3KE Kepala Keluarga',
-            '_be_breadcrumbs' => ['Master Data','Master P3KE Kepala Keluarga','Detail P3KE Kepala Keluarga'],
-            '_be_card_title' => 'Detail P3KE Kepala Keluarga',
+            '_be_page_title' => 'Detail DTSEN KK',
+            '_be_page_title_desc' => 'Halaman ini adalah Detail DTSEN KK',
+            '_be_breadcrumbs' => ['Master Data','Master DTSEN KK','Detail DTSEN KK'],
+            '_be_card_title' => 'Detail DTSEN KK',
             '_be_home' => route('master.destitution_kk.list'),
             '_parent_id' => $id,
         ];

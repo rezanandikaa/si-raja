@@ -145,8 +145,8 @@ class Menu
             'class' => 'fa fa-database',
             'has_child' => true,
             'childs' => [
-                ['sub_title' => 'P3KE Individu', 'id' => 'mt_destitution_nik', 'action' => 'master.destitution_nik.list', 'active_flag' => false],
-                ['sub_title' => 'P3KE Kepala Keluarga', 'id' => 'mt_destitution_kk', 'action' => 'master.destitution_kk.list', 'active_flag' => false],
+                ['sub_title' => 'DTSEN ART', 'id' => 'mt_destitution_nik', 'action' => 'master.destitution_nik.list', 'active_flag' => false],
+                ['sub_title' => 'DTSEN KK', 'id' => 'mt_destitution_kk', 'action' => 'master.destitution_kk.list', 'active_flag' => false],
                 ['sub_title' => 'Templat Program', 'id' => 'mt_program_template', 'action' => 'master.program_template.list', 'active_flag' => false],
                 ['sub_title' => 'Templat Grafik', 'id' => 'mt_dashboard', 'action' => 'master.dashboard.list', 'active_flag' => false],
                 ['sub_title' => 'Sumber Pembiayaan', 'id' => 'mt_budget_source', 'action' => 'master.budget_source.list', 'active_flag' => false],

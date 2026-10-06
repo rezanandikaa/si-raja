@@ -1,87 +1,7 @@
-@php
-$datatable = [];
-
-$datatable['json_data'] = [
-    ["data" => "p3ke", "name" => "mt_destitution_kk.p3ke"],
-    ["data" => "last_update_year", "name" => "mt_destitution_kk.last_update_year"],
-    ["data" => "subdistrict_code", "name" => "subdistrict.code"],
-    ["data" => "district_name", "name" => "district.name"],
-    ["data" => "subdistrict_name", "name" => "subdistrict.name"],
-    ["data" => "nik", "name" => "mt_destitution_kk.nik"],
-    ["data" => "name", "name" => "mt_destitution_kk.name"],
-    ["data" => "decile", "name" => "mt_destitution_kk.decile"],
-    ["data" => "percentile", "name" => "mt_destitution_kk.percentile"],
-    ["data" => "updated_by_name", "name" => "updated_by.name"],
-    ["data" => "updated_at", "name" => "mt_destitution_kk.updated_at"],
-    ["data" => "action", "name" => "action", "orderable" => false, "searchable" => false],
-];
-
-$datatable['route_data'] = route('master.destitution_kk.get_data');
-$datatable['route_insert'] = route('master.destitution_kk.insert');
-
-@endphp
-
 @extends('baduyengine.app')
 
 @section('vendor-css')
 <link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/dataTables.bootstrap4.min.css') }}">
-<link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/fixedeader/dataTables.fixedcolumns.bootstrap4.min.css') }}">
-<link rel="stylesheet" href="{{ asset('assets/vendor/jquery-datatable/fixedeader/dataTables.fixedheader.bootstrap4.min.css') }}">
-@endsection
-
-@section('vendor-js')
-<script src="{{ asset('assets/bundles/datatablescripts.bundle.js') }}"></script>
-<script src="{{ asset('assets/vendor/jquery-datatable/buttons/dataTables.buttons.min.js') }}"></script>
-<script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.bootstrap4.min.js') }}"></script>
-<script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.colVis.min.js') }}"></script>
-<script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.html5.min.js') }}"></script>
-<script src="{{ asset('assets/vendor/jquery-datatable/buttons/buttons.print.min.js') }}"></script>
-
-@include('baduyengine.component.datatable', $datatable)
-<script>
-$(document).ready(function () {
-    $('.js-basic-datatable tbody').on('click', 'a.import', function (e) {
-        e.preventDefault();
-        let data_url = $(this).attr('data-url');
-        swal({
-            title: "Impor Data!",
-            text: "Anda yakin akan tambahkan berkas ini ke antrian ?",
-            type: "warning",
-            showCancelButton: true,
-            confirmButtonColor: "#59C4BC",
-            confirmButtonText: "Ya",
-            cancelButtonText: "Kembali",
-            closeOnConfirm: false,
-            closeOnCancel: false
-        }, function (isConfirm) {
-            if (isConfirm) {
-                $.ajax({
-                    headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')},
-                    type: "POST",
-                    url: data_url,
-                    success: function(response){
-                        if(response.status === 'OK'){
-                            swal("Berhasil", response.message, "success");
-                            window.location.href = "{{ route('master.destitution_kk.list') }}";
-                        } else {
-                            swal("Terjadi Kesalahan", response.message, "error");
-                        }
-                        $(this).removeAttr('disabled');
-                    },
-                    statusCode: {
-                        500: function() {
-                            swal("Terjadi Kesalahan", 'Kesalahan sistem 500', "error");
-                            $(this).removeAttr('disabled');
-                        }
-                    }
-                });
-            } else {
-                swal("Dibatalkan", "Data tidak di impor", "error");
-            }
-        });
-    });
-});
-</script>
 @endsection
 
 @section('content')
@@ -98,17 +18,6 @@ $(document).ready(function () {
                         <li class="breadcrumb-item active">{{ $data['_be_page_title'] }}</li>
                     </ul>
                 </div>
-                {{-- <div class="col-lg-6 col-md-6 col-sm-12">
-                    <div class="d-flex flex-row-reverse">
-                        <div class="page_action">
-                            <button type="button" class="btn btn-primary"><i class="fa fa-download"></i> Download report</button>
-                            <button type="button" class="btn btn-secondary"><i class="fa fa-send"></i> Send report</button>
-                        </div>
-                        <div class="p-2 d-flex">
-
-                        </div>
-                    </div>
-                </div> --}}
             </div>
         </div>
 
@@ -119,26 +28,33 @@ $(document).ready(function () {
                         <h2>{{ $data['_be_page_title']}}<small>{{ $data['_be_page_title_desc']}} </small> </h2>
                     </div>
                     <div class="body">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-custom dataTable js-basic-datatable" width="100%">
-                                <thead>
-                                    <tr>
-                                        <th>P3KE</th>
-                                        <th>Dimuktakhirkan Tahun</th>
-                                        <th>Kode Kemdagri</th>
-                                        <th>Kecamatan</th>
-                                        <th>Desa/Kelurahan</th>
-                                        <th>NIK</th>
-                                        <th>Nama</th>
-                                        <th>Desil Kesejahteraan</th>
-                                        <th>Persentil</th>
-                                        <th>Diubah oleh</th>
-                                        <th>Diubah pada</th>
-                                        <th>Opsi</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
+                        <form id="beUploadForm" method="POST" action="{{ route('master.destitution_kk.upload') }}" enctype="multipart/form-data" autocomplete="off">
+                            @csrf
+                            <div class="form-group">
+                                <label for="file">Berkas DTSEN KK <span class="text-danger">*</span></label>
+                                <input type="file" class="form-control" id="file" name="file" accept=".xlsx" required>
+                                <small class="text-muted">Format Excel (.xlsx). Berkas masuk antrian impor.</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="beUploadBtn">
+                                <i class="fa fa-upload"></i> Upload DTSEN KK
+                            </button>
+                        </form>
+
+                        <div id="bePreview" class="mt-4" style="display: none;">
+                            <hr>
+                            <div id="bePreviewLoading" class="text-center py-5" style="display: none;">
+                                <i class="fa fa-spinner fa-spin fa-3x text-primary"></i>
+                            </div>
+                            <div id="bePreviewContent">
+                                <div class="form-group">
+                                    <label for="bePreviewSheet">Sheet</label>
+                                    <select class="form-control" id="bePreviewSheet"></select>
+                                    <small class="text-muted" id="bePreviewNote"></small>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-striped" id="bePreviewTable"></table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -146,4 +62,139 @@ $(document).ready(function () {
         </div>
     </div>
 </div>
+@endsection
+
+@section('vendor-js')
+<script src="{{ asset('assets/bundles/datatablescripts.bundle.js') }}"></script>
+<script>
+let beBatchCode = @json($data['_be_preview_batch'] ?? null);
+let beSheet = @json($data['_be_preview_sheet'] ?? null);
+
+// Nilai sel ditulis lewat .text(), bukan .html() — isinya data warga.
+function beRenderPreview(preview) {
+    if (!preview || !preview.columns.length) {
+        $('#bePreview').hide();
+        return;
+    }
+
+    let head = $('<tr>');
+    $.each(preview.columns, function (i, name) { head.append($('<th>').text(name)); });
+
+    let body = $('<tbody>');
+    $.each(preview.rows, function (i, row) {
+        let tr = $('<tr>');
+        $.each(row, function (j, value) { tr.append($('<td>').text(value === null ? '' : value)); });
+        body.append(tr);
+    });
+
+    // DataTables membekukan jumlah baris di dalam DOM, jadi tabel dibongkar
+    // ulang tiap ganti sheet: instance lama dibuang dulu, kalau tidak baris
+    // dari sheet sebelumnya ikut tertinggal.
+    if ($.fn.DataTable.isDataTable('#bePreviewTable')) {
+        $('#bePreviewTable').DataTable().destroy();
+    }
+    $('#bePreviewTable').empty().append($('<thead>').append(head)).append(body);
+    $('#bePreviewTable').DataTable({
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Semua"]],
+        order: [],
+        columnDefs: [{targets: '_all', defaultContent: ''}]
+    });
+
+    let select = $('#bePreviewSheet').empty();
+    $.each(preview.sheets, function (i, name) {
+        select.append($('<option>').val(name).text(name).prop('selected', name === preview.sheet));
+    });
+    select.toggle(preview.sheets.length > 1);
+
+    let note = 'Sheet "' + preview.sheet + '": ' + preview.columns.length + ' kolom, '
+        + preview.rows.length + ' baris dimuat'
+        + (preview.truncated ? ' (25 baris per halaman, sisanya masih ada di berkas)' : '') + '.';
+    note += ' Impor memakai sheet ini.';
+    $('#bePreviewNote').text(note);
+
+    $('#bePreview').show();
+}
+
+function beSetLoading(loading) {
+    $('#bePreviewLoading').toggle(loading);
+    $('#bePreviewContent').toggle(!loading);
+}
+
+// silent dipakai saat memuat ulang halaman: kalau berkasnya sudah tidak ada,
+// tabel cukup tidak ditampilkan tanpa muncul peringatan.
+function beLoadPreview(sheet, silent) {
+    $('#bePreview').show();
+    beSetLoading(true);
+
+    $.ajax({
+        headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')},
+        type: "GET",
+        url: "{{ route('master.destitution_kk.preview') }}",
+        data: {batch_code: beBatchCode, sheet: sheet},
+        success: function (response) {
+            beSetLoading(false);
+            if (response.status === 'OK' && response.preview && response.preview.columns.length) {
+                beSheet = response.preview.sheet;
+                beRenderPreview(response.preview);
+            } else if (silent) {
+                $('#bePreview').hide();
+            } else {
+                swal("Terjadi Kesalahan", response.message || 'Pratinjau tidak tersedia', "error");
+            }
+        },
+        error: function (xhr) {
+            beSetLoading(false);
+            if (silent) {
+                $('#bePreview').hide();
+            } else {
+                swal("Terjadi Kesalahan", 'Kesalahan sistem ' + xhr.status, "error");
+            }
+        }
+    });
+}
+
+$(document).ready(function () {
+    // Lanjutkan pratinjau unggahan terakhir setelah pindah halaman / refresh.
+    if (beBatchCode) {
+        beLoadPreview(beSheet, true);
+    }
+
+    $('#beUploadForm').on('submit', function (e) {
+        e.preventDefault();
+        let form = $(this);
+        let btn = $('#beUploadBtn');
+        btn.attr('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Membaca berkas...');
+
+        $.ajax({
+            headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')},
+            type: "POST",
+            url: form.attr('action'),
+            data: new FormData(this),
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                btn.removeAttr('disabled').html('<i class="fa fa-upload"></i> Upload DTSEN KK');
+                if (response.status === 'OK') {
+                    swal("Berhasil", response.message, "success");
+                    form[0].reset();
+                    beBatchCode = response.batch_code;
+                    beSheet = response.preview ? response.preview.sheet : beSheet;
+                    beRenderPreview(response.preview);
+                } else {
+                    swal("Terjadi Kesalahan", response.message, "error");
+                }
+            },
+            error: function (xhr) {
+                btn.removeAttr('disabled').html('<i class="fa fa-upload"></i> Upload DTSEN KK');
+                swal("Terjadi Kesalahan", xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Kesalahan sistem ' + xhr.status, "error");
+            }
+        });
+    });
+
+    $('#bePreviewSheet').on('change', function () {
+        beLoadPreview($(this).val(), false);
+    });
+});
+</script>
 @endsection

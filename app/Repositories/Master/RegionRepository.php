@@ -74,6 +74,37 @@ class RegionRepository
             ->first();
     }
 
+    /**
+     * Cari wilayah berdasarkan nama, dibatasi wilayah induknya.
+     *
+     * Nama desa/kelurahan berulang antar kecamatan, jadi parent_id wajib ikut
+     * dicocokkan. Spasi dan tanda baca dibuang lebih dulu karena dokumen DTSEN
+     * dan mt_region berbeda penulisan (dokumen 'CURUGBITUNG', mt_region
+     * 'CURUG BITUNG'). Mengembalikan null kalau tidak ketemu — pemanggil yang
+     * memutuskan barisnya dilewati atau tidak.
+     */
+    public function getRecordByNameAndParent($name, $parent_id)
+    {
+        $normalized = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string) $name)));
+        if ($normalized === null || $normalized === '') {
+            return null;
+        }
+
+        return $this->model
+            ->where($this->table_name.'.parent_id', $parent_id)
+            ->whereNull($this->table_name.'.deleted_at')
+            ->whereRaw(
+                "REPLACE(REPLACE(REPLACE(UPPER({$this->table_name}.name), ' ', ''), '.', ''), '-', '') = ?",
+                [$normalized]
+            )
+            ->orderBy($this->table_name.'.id')
+            ->select(
+                $this->table_name.'.*'
+            )
+            ->get()
+            ->first();
+    }
+
     public function getRecordsByType($type)
     {
         return $this->model

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Libraries\DtsenDocumentMapper;
 use App\Models\System\Sy_import;
 use App\Repositories\Master\DestitutionKkRepository;
 use App\Repositories\Master\DestitutionNikRepository;
@@ -33,12 +34,18 @@ class SyncData extends Command
     protected $import_repo;
     protected $region_repo;
     protected $option_repo;
+    protected $document_mapper;
+
+    /** Hitungan baris dokumen, dilaporkan di akhir perintah. */
+    protected $document_imported = 0;
+    protected $document_skipped = 0;
 
     public function __construct(DestitutionNikRepository $destitution_nik_repo,
         DestitutionKkRepository $destitution_kk_repo,
         ImportRepository $import_repo,
         RegionRepository $region_repo,
-        OptionRepository $option_repo)
+        OptionRepository $option_repo,
+        DtsenDocumentMapper $document_mapper)
     {
         parent::__construct();
         $this->destitution_nik_repo = $destitution_nik_repo;
@@ -46,6 +53,7 @@ class SyncData extends Command
         $this->import_repo = $import_repo;
         $this->region_repo = $region_repo;
         $this->option_repo = $option_repo;
+        $this->document_mapper = $document_mapper;
     }
 
     /**
@@ -68,9 +76,17 @@ class SyncData extends Command
         $i = 0;
         foreach ($records as $record) {
             $progressBar->setProgress($i);
-            if ($record->type == 'INDIVIDU') {
-                $destitution = json_decode($record->data, true);
+            $destitution = json_decode($record->data, true);
 
+            // Dokumen DTSEN (sheet KK/ART) punya header sendiri dan lewat
+            // DtsenDocumentMapper; berkas P3KE lama tetap lewat jalur di bawah.
+            if (DtsenDocumentMapper::isDocumentRow($destitution)) {
+                $this->syncDocumentRow($record, $destitution);
+                $i++;
+                continue;
+            }
+
+            if ($record->type == 'INDIVIDU') {
                 $kemdagri_code = $destitution['Kode Kemdagri'] ?? null;
                 if ($kemdagri_code == null) {
                     Log::info("Error Kode Kemdagri :".json_encode($destitution));
@@ -674,5 +690,46 @@ class SyncData extends Command
             $i++;
         }
         $progressBar->finish();
+
+        if ($this->document_imported > 0 || $this->document_skipped > 0) {
+            $this->info("\nDokumen DTSEN: {$this->document_imported} baris masuk, {$this->document_skipped} baris dilewati (wilayah tidak ketemu / berkas tidak dikenal).");
+        }
+    }
+
+    /**
+     * Satu baris dokumen DTSEN: dipetakan DtsenDocumentMapper lalu disimpan.
+     *
+     * Wilayah yang tidak ketemu dilewati dan dihitung, bukan ditebak — nama
+     * kecamatan/kelurahan di dokumen harus persis sama dengan mt_region.
+     */
+    protected function syncDocumentRow($record, array $destitution)
+    {
+        $data = $this->document_mapper->map($destitution, $record->type);
+        if ($data === null) {
+            $this->document_skipped++;
+            // Hanya nama wilayah yang dicatat, bukan isi barisnya: baris
+            // dokumen memuat data pribadi warga.
+            $district = $destitution['kecamatan'] ?? $destitution['kecamatan_ktp'] ?? '(kosong)';
+            $subdistrict = $destitution['kelurahan_desa'] ?? $destitution['kelurahan_desa_ktp'] ?? '(kosong)';
+            Log::info("Dokumen {$record->type} (file {$record->file_id}): wilayah tidak ketemu — kecamatan '{$district}', kelurahan '{$subdistrict}'");
+            return;
+        }
+
+        $data['data_id'] = source_data_active();
+
+        DB::beginTransaction();
+        try {
+            if ($record->type == DtsenDocumentMapper::TYPE_ART) {
+                $this->destitution_nik_repo->insertRecord($data);
+            } else {
+                $this->destitution_kk_repo->insertRecord($data);
+            }
+            $this->import_repo->updateRecord($record->id, ['is_sync' => true]);
+            DB::commit();
+            $this->document_imported++;
+        } catch (\Exception $err) {
+            Log::info("Error {$err->getCode()} : {$err->getMessage()}");
+            DB::rollBack();
+        }
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
+use App\Libraries\DtsenDocumentMapper;
 use App\Repositories\Master\DashboardRepository;
 use App\Repositories\Master\DestitutionKkRepository;
 use App\Repositories\Master\DestitutionNikRepository;
@@ -13,6 +14,7 @@ use App\Repositories\Transaction\ProgramRealizationRepository;
 use App\Repositories\Transaction\ProgramRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class BnbaController extends Controller
 {
@@ -43,6 +45,115 @@ class BnbaController extends Controller
         $this->option_repo = $option_repo;
         $this->dashboard_template_repo = $dashboard_template_repo;
         $this->user_access_repo = $user_access_repo;
+    }
+
+    /**
+     * Daftar kolom yang boleh disebut properti grafik untuk satu sumber.
+     *
+     * Selalu daftar kolom sungguhan dari sisi server, tidak pernah dari
+     * request: nama kolom ikut masuk SQL.
+     */
+    protected function allowedChartColumns($source)
+    {
+        $document_type = DtsenDocumentMapper::typeForSource($source);
+        if ($document_type !== null) {
+            $table_name = $document_type == DtsenDocumentMapper::TYPE_ART
+                ? 'mt_destitution_nik'
+                : 'mt_destitution_kk';
+
+            // Kolom dokumen untuk grafik baru, ditambah kolom tabel supaya
+            // dashboard lama yang menyebut kolom tabel tetap jalan.
+            return array_merge(DtsenDocumentMapper::columns($document_type), Schema::getColumnListing($table_name));
+        }
+        if ($source == 'PROGRAM') {
+            return Schema::getColumnListing('tr_program');
+        }
+        if ($source == 'REALISASI') {
+            return Schema::getColumnListing('tr_program_realization');
+        }
+
+        return [];
+    }
+
+    /**
+     * Judul kolom tabel data warga, dipakai halaman drill-down. Sama untuk NIK
+     * dan KK; hanya nama tabelnya yang berbeda.
+     */
+    protected function destitutionHeaders($table_name)
+    {
+        return [
+            ["label" => "Sumber Data", "data" => "data_name", "name" => "sy_data.name"],
+            ["label" => "ID P3KE", "data" => "p3ke", "name" => "{$table_name}.p3ke"],
+            ["label" => "Dimuktakhirkan Tahun", "data" => "last_update_year", "name" => "{$table_name}.last_update_year"],
+            ["label" => "Kode Kemdagri", "data" => "subdistrict_code", "name" => "subdistrict.code"],
+            ["label" => "Kecamatan", "data" => "district_name", "name" => "district.name"],
+            ["label" => "Desa/Kelurahan", "data" => "subdistrict_name", "name" => "subdistrict.name"],
+            ["label" => "NIK", "data" => "nik", "name" => "{$table_name}.nik"],
+            ["label" => "Nama", "data" => "name", "name" => "{$table_name}.name"],
+            ["label" => "Desil Kesejahteraan", "data" => "decile", "name" => "{$table_name}.decile"],
+            ["label" => "Persentil", "data" => "percentile", "name" => "{$table_name}.percentile"],
+            ["label" => "Diubah oleh", "data" => "updated_by_name", "name" => "updated_by.name"],
+            ["label" => "Diubah pada", "data" => "updated_at", "name" => "{$table_name}.updated_at"],
+        ];
+    }
+
+    /**
+     * Drill-down grafik yang dikelompokkan menurut kolom dokumen DTSEN
+     * (properti tanpa "Kelompokkan Berdasarkan").
+     *
+     * Kartunya satu per nilai kolom. `id` pada kartu adalah nilai mentah kolom
+     * itu (dipakai menyaring tabel), `value` adalah teks yang dibaca orang
+     * (nama wilayah untuk kolom bertipe id).
+     *
+     * @return array|null null kalau propertinya bukan mode kelompok-kolom.
+     */
+    protected function documentDrilldown($dashboard, $props)
+    {
+        $document_type = DtsenDocumentMapper::typeForSource($dashboard->source);
+        if ($document_type === null || !empty($props['key'])) {
+            return null;
+        }
+
+        $allowed = DtsenDocumentMapper::columns($document_type);
+        $group_column = $props['column'] ?? null;
+        if (!in_array($group_column, $allowed, true)) {
+            return null;
+        }
+
+        $is_individu = $document_type == DtsenDocumentMapper::TYPE_ART;
+        $table_name = $is_individu ? 'mt_destitution_nik' : 'mt_destitution_kk';
+
+        $cond = '1=1';
+        if (!empty($props['district_id']) && !empty($props['subdistrict_id'])) {
+            $cond .= " and {$table_name}.district_id = '" . (int) $props['district_id'] . "'";
+            $cond .= " and {$table_name}.subdistrict_id = '" . (int) $props['subdistrict_id'] . "'";
+        }
+
+        $sum_column = (($props['type'] ?? null) == 'SUM' && in_array($props['value'] ?? null, $allowed, true))
+            ? $props['value']
+            : null;
+
+        $repo = $is_individu ? $this->destitution_nik_repo : $this->destitution_kk_repo;
+        $rows = $repo->getGroupedByColumn($group_column, $cond, $sum_column);
+
+        $datas = ['total' => 0];
+        $options = [];
+        foreach ($rows as $key => $row) {
+            $datas['total_' . ($key + 1)] = number_format($row->total);
+            $datas['total'] += $row->total;
+            $options[] = ['id' => $row->value, 'value' => $row->label];
+        }
+        $datas['total'] = number_format($datas['total']);
+
+        return [
+            'data' => $datas,
+            'options' => $options,
+            'headers' => $this->destitutionHeaders($table_name),
+            'route' => route($is_individu ? 'master.destitution_nik.get_data' : 'master.destitution_kk.get_data'),
+            // Kondisi saring DataTable memakai nama tabel + kolom mentahnya.
+            'column' => $table_name . '.' . $group_column,
+            'subtitle' => $props['column'],
+        ];
     }
 
     public function detail(Request $request, $source)
@@ -242,7 +353,12 @@ class BnbaController extends Controller
             $dashboard = $this->dashboard_template_repo->getRecord($dashboard_id);
             $props = json_decode($dashboard->properties, true);
 
+            // 'key' kosong itu sah selama kolom dokumennya dikenal (grafik
+            // dikelompokkan per kolom); selain itu propertinya tidak bisa dipakai.
             if (!isset($props['key'])) {
+                return redirect(route('home'));
+            }
+            if (!in_array($props['column'] ?? null, $this->allowedChartColumns($dashboard->source), true)) {
                 return redirect(route('home'));
             }
             $options = $this->option_repo->getRecordsByCode($props['key']);
@@ -250,7 +366,17 @@ class BnbaController extends Controller
             $route = route('home');
             $headers = [];
             $column = $props['column'];
-            if ($dashboard->source == 'P3KE-INDIVIDU') {
+            $document_drilldown = $this->documentDrilldown($dashboard, $props);
+            if ($document_drilldown !== null) {
+                // Grafik yang dikelompokkan per kolom dokumen: kartunya satu per
+                // nilai kolom, bukan per pilihan sy_option.
+                $datas = $document_drilldown['data'];
+                $options = $document_drilldown['options'];
+                $headers = $document_drilldown['headers'];
+                $route = $document_drilldown['route'];
+                $column = $document_drilldown['column'];
+                $subtitle = $document_drilldown['subtitle'];
+            } elseif ($dashboard->source == 'P3KE-INDIVIDU') {
                 if (isset($props['district_id']) && isset($props['subdistrict_id']) && $props['district_id'] != null && $props['subdistrict_id'] != null) {
                     $cond .= " and mt_destitution_nik.district_id = '{$props['district_id']}'";
                     $cond .= " and mt_destitution_nik.subdistrict_id = '{$props['subdistrict_id']}'";
@@ -268,20 +394,7 @@ class BnbaController extends Controller
                 }
                 $datas['total'] = number_format($datas['total']);
                 $route = route('master.destitution_nik.get_data');
-                $headers = [
-                    ["label" => "Sumber Data", "data" => "data_name", "name" => "sy_data.name"],
-                    ["label" => "ID P3KE", "data" => "p3ke", "name" => "mt_destitution_nik.p3ke"],
-                    ["label" => "Dimuktakhirkan Tahun", "data" => "last_update_year", "name" => "mt_destitution_nik.last_update_year"],
-                    ["label" => "Kode Kemdagri", "data" => "subdistrict_code", "name" => "subdistrict.code"],
-                    ["label" => "Kecamatan", "data" => "district_name", "name" => "district.name"],
-                    ["label" => "Desa/Kelurahan", "data" => "subdistrict_name", "name" => "subdistrict.name"],
-                    ["label" => "NIK", "data" => "nik", "name" => "mt_destitution_nik.nik"],
-                    ["label" => "Nama", "data" => "name", "name" => "mt_destitution_nik.name"],
-                    ["label" => "Desil Kesejahteraan", "data" => "decile", "name" => "mt_destitution_nik.decile"],
-                    ["label" => "Persentil", "data" => "percentile", "name" => "mt_destitution_nik.percentile"],
-                    ["label" => "Diubah oleh", "data" => "updated_by_name", "name" => "updated_by.name"],
-                    ["label" => "Diubah pada", "data" => "updated_at", "name" => "mt_destitution_nik.updated_at"],
-                ];
+                $headers = $this->destitutionHeaders('mt_destitution_nik');
                 $column = 'mt_destitution_nik.' . $props['column'];
             } elseif ($dashboard->source == 'P3KE-KEPALA-KELUARGA') {
                 if (isset($props['district_id']) && isset($props['subdistrict_id']) && $props['district_id'] != null && $props['subdistrict_id'] != null) {
@@ -301,20 +414,7 @@ class BnbaController extends Controller
                 }
                 $datas['total'] = number_format($datas['total']);
                 $route = route('master.destitution_kk.get_data');
-                $headers = [
-                    ["label" => "Sumber Data", "data" => "data_name", "name" => "sy_data.name"],
-                    ["label" => "ID P3KE", "data" => "p3ke", "name" => "mt_destitution_kk.p3ke"],
-                    ["label" => "Dimuktakhirkan Tahun", "data" => "last_update_year", "name" => "mt_destitution_kk.last_update_year"],
-                    ["label" => "Kode Kemdagri", "data" => "subdistrict_code", "name" => "subdistrict.code"],
-                    ["label" => "Kecamatan", "data" => "district_name", "name" => "district.name"],
-                    ["label" => "Desa/Kelurahan", "data" => "subdistrict_name", "name" => "subdistrict.name"],
-                    ["label" => "NIK", "data" => "nik", "name" => "mt_destitution_kk.nik"],
-                    ["label" => "Nama", "data" => "name", "name" => "mt_destitution_kk.name"],
-                    ["label" => "Desil Kesejahteraan", "data" => "decile", "name" => "mt_destitution_kk.decile"],
-                    ["label" => "Persentil", "data" => "percentile", "name" => "mt_destitution_kk.percentile"],
-                    ["label" => "Diubah oleh", "data" => "updated_by_name", "name" => "updated_by.name"],
-                    ["label" => "Diubah pada", "data" => "updated_at", "name" => "mt_destitution_kk.updated_at"],
-                ];
+                $headers = $this->destitutionHeaders('mt_destitution_kk');
                 $column = 'mt_destitution_kk.' . $props['column'];
             } elseif ($dashboard->source == 'PROGRAM') {
                 if (isset($props['district_id']) && isset($props['subdistrict_id']) && $props['district_id'] != null && $props['subdistrict_id'] != null) {

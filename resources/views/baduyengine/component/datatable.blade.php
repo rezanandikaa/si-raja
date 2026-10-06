@@ -33,6 +33,7 @@ $(document).ready(function(){
                 }
             },
             @endif
+            @if (!($datatable['hide_refresh'] ?? false))
             {
                 text: '<i class="fa fa-refresh"></i> Refresh',
                 action: function ( e, dt, node, config ) {
@@ -40,6 +41,7 @@ $(document).ready(function(){
                 },
                 className: 'btn-primary',
             },
+            @endif
             {
                 text: 'Buat Baru',
                 className: 'btn-secondary',

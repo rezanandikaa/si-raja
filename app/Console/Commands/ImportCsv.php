@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Jobs\ImportCsvJob;
+use App\Libraries\SheetReader;
 use App\Models\System\Sy_file;
 use App\Repositories\System\FileRepository;
 use Illuminate\Console\Command;
@@ -17,7 +18,9 @@ class ImportCsv extends Command
      *
      * @var string
      */
-    protected $signature = 'baduyengine:import';
+    protected $signature = 'baduyengine:import
+        {--file-id= : Hanya proses berkas ini (untuk uji coba)}
+        {--limit= : Batas jumlah baris per berkas; berkas tidak ditandai selesai}';
 
     /**
      * The console command description.
@@ -27,11 +30,13 @@ class ImportCsv extends Command
     protected $description = 'Command description';
 
     protected $file_repo;
+    protected $sheet_reader;
 
-    public function __construct(FileRepository $file_repo)
+    public function __construct(FileRepository $file_repo, SheetReader $sheet_reader)
     {
         parent::__construct();
         $this->file_repo = $file_repo;
+        $this->sheet_reader = $sheet_reader;
     }
 
     /**
@@ -39,10 +44,65 @@ class ImportCsv extends Command
      */
     public function handle()
     {
+        $limit = $this->option('limit') !== null ? (int) $this->option('limit') : null;
+
         $records = Sy_file::where('is_sync', false)
+            ->when($this->option('file-id'), function ($query, $file_id) {
+                return $query->where('id', $file_id);
+            })
             ->get();
         foreach ($records as $file) {
             $path = storage_path($file->path);
+
+            // Berkas Excel dibaca streaming per baris (baris pertama = header),
+            // supaya kolom JSON-nya sama dengan yang diharapkan SyncData.
+            if (strtolower($file->extension) == 'xlsx') {
+                // Satu berkas DTSEN bisa memuat sheet KK dan ART; yang dibaca
+                // mengikuti tipe berkasnya, sama dengan pratinjau di halaman.
+                $sheet_name = $file->type == 'INDIVIDU'
+                    ? SheetReader::SHEET_ART
+                    : SheetReader::SHEET_KK;
+
+                $chunks = 0;
+                $rows = 0;
+                foreach ($this->sheet_reader->stream($path, $sheet_name) as $chunk) {
+                    if ($limit !== null) {
+                        $chunk = array_slice($chunk, 0, max(0, $limit - $rows));
+                        $rows += count($chunk);
+                        if ($rows >= $limit && count($chunk) == 0) {
+                            break;
+                        }
+                    } else {
+                        $rows += count($chunk);
+                    }
+
+                    ImportCsvJob::dispatch($chunk, $file->id);
+                    $chunks++;
+
+                    if ($limit !== null && $rows >= $limit) {
+                        break;
+                    }
+                }
+
+                // Sheet tidak ketemu / kosong: jangan ditandai selesai supaya
+                // ketahuan dan bisa dijalankan ulang setelah berkasnya diperbaiki.
+                if ($chunks == 0) {
+                    $this->warn("Tidak ada baris terbaca dari {$file->file_name_original} (sheet {$sheet_name} kosong?)");
+                    continue;
+                }
+
+                // Impor terbatas hanya untuk uji coba: berkasnya sengaja tidak
+                // ditandai selesai supaya sisa barisnya tetap ikut pada impor penuh.
+                // Konsekuensinya baris yang sudah masuk akan terimpor dua kali.
+                if ($limit !== null) {
+                    $this->warn("Impor terbatas: {$rows} baris pertama {$file->file_name_original} (sheet {$sheet_name}), berkas belum ditandai selesai.");
+                    continue;
+                }
+
+                $this->file_repo->updateRecord($file->id, ['is_sync' => true]);
+                $this->info("Queue import was created for {$file->file_name_original} ({$chunks} bungkus)...");
+                continue;
+            }
 
             $csv = Reader::createFromPath($path, 'r');
             $csv->setHeaderOffset(0); // Misalnya, jika baris pertama adalah header

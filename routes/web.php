@@ -99,6 +99,8 @@ Route::group(['prefix' => env('ADMIN_LOGIN', 'administrator')], function () {
         Route::get('/master-destitution-nik', [DestitutionNikController::class, 'list'])->name('master.destitution_nik.list')->middleware('access.module:mt_destitution_nik');
         Route::get('/master-destitution-nik/insert', [DestitutionNikController::class, 'insert'])->name('master.destitution_nik.insert')->middleware('access.module:mt_destitution_nik');
         Route::post('/master-destitution-nik/save', [DestitutionNikController::class, 'store'])->name('master.destitution_nik.store')->middleware('access.module:mt_destitution_nik');
+        Route::post('/master-destitution-nik/upload', [DestitutionNikController::class, 'upload'])->name('master.destitution_nik.upload')->middleware('access.module:mt_destitution_nik');
+        Route::get('/master-destitution-nik/preview', [DestitutionNikController::class, 'preview'])->name('master.destitution_nik.preview')->middleware('access.module:mt_destitution_nik');
         // Route::get('/master-destitution-nik/edit/{id}', [DestitutionNikController::class, 'edit'])->name('master.destitution_nik.edit')->middleware('access.module:mt_destitution_nik');
         Route::post('/master-destitution-nik/get_data', [DestitutionNikController::class, 'get_data'])->name('master.destitution_nik.get_data')->middleware('access.module:mt_destitution_nik');
         // Route::put('/master-destitution-nik/update/{id}', [DestitutionNikController::class, 'update'])->name('master.destitution_nik.update')->middleware('access.module:mt_destitution_nik');
@@ -128,6 +130,8 @@ Route::group(['prefix' => env('ADMIN_LOGIN', 'administrator')], function () {
         Route::get('/master-destitution-kk', [DestitutionKkController::class, 'list'])->name('master.destitution_kk.list')->middleware('access.module:mt_destitution_kk');
         Route::get('/master-destitution-kk/insert', [DestitutionKkController::class, 'insert'])->name('master.destitution_kk.insert')->middleware('access.module:mt_destitution_kk');
         Route::post('/master-destitution-kk/save', [DestitutionKkController::class, 'store'])->name('master.destitution_kk.store')->middleware('access.module:mt_destitution_kk');
+        Route::post('/master-destitution-kk/upload', [DestitutionKkController::class, 'upload'])->name('master.destitution_kk.upload')->middleware('access.module:mt_destitution_kk');
+        Route::get('/master-destitution-kk/preview', [DestitutionKkController::class, 'preview'])->name('master.destitution_kk.preview')->middleware('access.module:mt_destitution_kk');
         // Route::get('/master-destitution-kk/edit/{id}', [DestitutionKkController::class, 'edit'])->name('master.destitution_kk.edit')->middleware('access.module:mt_destitution_kk');
         Route::post('/master-destitution-kk/get_data', [DestitutionKkController::class, 'get_data'])->name('master.destitution_kk.get_data')->middleware('access.module:mt_destitution_kk');
         // Route::put('/master-destitution-kk/update/{id}', [DestitutionKkController::class, 'update'])->name('master.destitution_kk.update')->middleware('access.module:mt_destitution_kk');

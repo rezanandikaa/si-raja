@@ -36,7 +36,7 @@ $datatable['route_data'] = route('master.destitution_kk.bnba.get_data', ['id' =>
                     <ul class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{{ route('home') }}"><i class="fa fa-dashboard"></i></a></li>
                         <li class="breadcrumb-item">Master</li>
-                        <li class="breadcrumb-item">P3KE Kepala Keluarga</li>
+                        <li class="breadcrumb-item">DTSEN KK</li>
                         <li class="breadcrumb-item active">{{ $data['_be_page_title'] }}</li>
                     </ul>
                 </div>
