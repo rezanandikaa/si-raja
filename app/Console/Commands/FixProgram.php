@@ -71,10 +71,10 @@ class FixProgram extends Command
                     $data = [];
                     $program_template = $this->program_template_repo->getRecord($record->program_template_id);
                     if ($program_template) {
-                        $data['sub_activity'] = $this->program_template_repo->getValueBySubActivityCode($program_template->code, 'sub_activity', 'concern', $record->budget_year_id);
-                        $data['organization_id'] = $this->program_template_repo->getValueBySubActivityCode($program_template->code, 'sub_activity', 'organization_id', $record->budget_year_id);
-                        $data['activity'] = $this->program_template_repo->getValueBySubActivityCode($program_template->code, 'activity', 'concern', $record->budget_year_id);
-                        $data['program'] = $this->program_template_repo->getValueBySubActivityCode($program_template->code, 'program', 'concern', $record->budget_year_id);
+                        $data['sub_activity'] = $program_template->concern;
+                        $data['organization_id'] = $program_template->organization_id;
+                        $data['activity'] = $this->program_template_repo->getValueBySubActivityCode($program_template->code, 'activity', 'concern', $record->budget_year_id, $program_template->organization_id);
+                        $data['program'] = $this->program_template_repo->getValueBySubActivityCode($program_template->code, 'program', 'concern', $record->budget_year_id, $program_template->organization_id);
                     }
                     $this->program_repo->updateRecord($record->id, $data);
                     Log::info('Fix Program: ' . json_encode($data));

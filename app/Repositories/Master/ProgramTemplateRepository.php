@@ -64,20 +64,27 @@ class ProgramTemplateRepository
         $this->model->destroy($id);
     }
 
-    public function getRecordByCode($code, $budget_year_id = 0)
+    public function getRecordByCode($code, $budget_year_id = 0, $organization_id = 0, $type = null)
     {
         return $this->model
             ->where($this->table_name . '.code', $code)
             ->when($budget_year_id != 0, function ($q) use ($budget_year_id) {
                 $q->where($this->table_name . '.budget_year_id', $budget_year_id);
             })
+            ->when($organization_id != 0, function ($q) use ($organization_id) {
+                $q->where($this->table_name . '.organization_id', $organization_id);
+            })
+            ->when($type != null, function ($q) use ($type) {
+                $q->where($this->table_name . '.type', $type);
+            })
+            ->orderBy($this->table_name . '.id', 'ASC')
             ->select(
                 $this->table_name . '.*'
             )
             ->first();
     }
 
-    public function getValueBySubActivityCode($code, $type, $column, $budget_year_id)
+    public function getValueBySubActivityCode($code, $type, $column, $budget_year_id, $organization_id = 0)
     {
         switch ($type) {
             case 'activity':
@@ -92,7 +99,7 @@ class ProgramTemplateRepository
                 break;
         }
 
-        $record = $this->getRecordByCode($code, $budget_year_id);
+        $record = $this->getRecordByCode($code, $budget_year_id, $organization_id, $type);
         if ($record) {
             return $record->$column ?? '';
         }

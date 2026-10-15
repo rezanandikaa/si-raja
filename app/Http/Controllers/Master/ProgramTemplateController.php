@@ -251,11 +251,6 @@ class ProgramTemplateController extends Controller
 
         DB::beginTransaction();
         try {
-            $cond = "mt_program_template.code = '{$data['code']}' and mt_program_template.budget_year_id = '{$data['budget_year_id']}'";
-            $records = $this->program_template_repo->getRecords($cond);
-            if ($records->count() > 0){
-                throw new \Exception("Program / Kegiatan / Sub Kegiatan Sudah Pernah Dibuat");
-            }
             $this->program_template_repo->insertRecord($data);
             $result = [
                 'status' => 'OK',
@@ -337,11 +332,6 @@ class ProgramTemplateController extends Controller
 
         DB::beginTransaction();
         try {
-            $cond = "mt_program_template.code = '{$data['code']}' and mt_program_template.budget_year_id = '{$data['budget_year_id']}' and mt_program_template.id <> '{$id}'";
-            $records = $this->program_template_repo->getRecords($cond);
-            if ($records->count() > 0){
-                throw new \Exception("Program / Kegiatan / Sub Kegiatan Sudah Pernah Dibuat");
-            }
             $this->program_template_repo->updateRecord($id, $data);
             $this->updateProgram($id);
             $result = [
@@ -394,15 +384,15 @@ class ProgramTemplateController extends Controller
             $data = $data->toArray();
             switch (strtolower($data['type'])) {
                 case 'program':
-                    $cond = "tr_program.budget_year_id = '{$data['budget_year_id']}' and tr_program.code LIKE '{$data['code']}%'";
+                    $cond = "tr_program.budget_year_id = '{$data['budget_year_id']}' and tr_program.organization_id = '{$data['organization_id']}' and tr_program.code LIKE '{$data['code']}%'";
                     $data_update = ['program' => $data['concern']];
                     break;
                 case 'activity':
-                    $cond = "tr_program.budget_year_id = '{$data['budget_year_id']}' and tr_program.code LIKE '{$data['code']}%'";
+                    $cond = "tr_program.budget_year_id = '{$data['budget_year_id']}' and tr_program.organization_id = '{$data['organization_id']}' and tr_program.code LIKE '{$data['code']}%'";
                     $data_update = ['activity' => $data['concern']];
                     break;
                 case 'sub_activity':
-                    $cond = "tr_program.budget_year_id = '{$data['budget_year_id']}' and tr_program.code = '{$data['code']}'";
+                    $cond = "tr_program.budget_year_id = '{$data['budget_year_id']}' and tr_program.organization_id = '{$data['organization_id']}' and tr_program.code = '{$data['code']}'";
                     $data_update = [
                         'code' => $data['code'],
                         'program_goal_id' => $data['program_goal_id'],
